@@ -150,3 +150,124 @@ footer p {
   nav ul { flex-direction: column; gap: 12px; }
   main { padding: 30px 15px; }
 }
+
+.ranking-page .ranking-container {
+  max-width: 960px;
+  margin: 0 auto;
+}
+
+.ranking-page__header {
+  text-align: center;
+  margin-bottom: 40px;
+}
+
+.ranking-page__title {
+  font-size: 2.4rem;
+  margin-bottom: 20px;
+}
+
+.ranking-page__lead p {
+  margin: 0 auto 1.5em;
+  max-width: 720px;
+}
+
+.ranking-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 24px;
+}
+
+.ranking-list__item {
+  background: var(--white);
+  border-radius: 16px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+}
+
+.ranking-card {
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.ranking-card__position {
+  background: var(--main-yellow);
+  color: var(--dark-gray);
+  font-weight: 700;
+  font-size: 1.8rem;
+  padding: 20px;
+  min-width: 140px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ranking-card__body {
+  flex: 1 1 0;
+  padding: 24px;
+  display: grid;
+  gap: 16px;
+}
+
+.ranking-card__image img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.ranking-card__content {
+  font-size: 1rem;
+}
+
+.ranking-card__actions {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.ranking-card__button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 24px;
+  border-radius: 50px;
+  font-weight: 700;
+  text-decoration: none;
+  transition: var(--transition);
+}
+
+.ranking-card__button--detail {
+  background: var(--dark-gray);
+  color: var(--white);
+}
+
+.ranking-card__button--detail:hover {
+  background: #000;
+}
+
+.ranking-card__button--official {
+  background: var(--main-yellow);
+  color: var(--dark-gray);
+}
+
+.ranking-card__button--official:hover {
+  background: var(--accent-yellow);
+}
+
+.ranking-page__empty {
+  text-align: center;
+  font-size: 1.1rem;
+  color: #777;
+}
+
+@media (max-width: 768px) {
+  .ranking-card {
+    flex-direction: column;
+  }
+
+  .ranking-card__position {
+    width: 100%;
+  }
+}
