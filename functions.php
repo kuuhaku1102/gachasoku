@@ -119,6 +119,14 @@ function gachasoku_render_ranking_list($entries = null, $args = []) {
       $image_link = isset($entry['image_link']) ? $entry['image_link'] : '';
       $image_link = gachasoku_apply_affiliate_url($image_link);
       $content = isset($entry['content']) ? $entry['content'] : '';
+      $payment_methods = isset($entry['payment_methods']) ? $entry['payment_methods'] : '';
+      $payment_items = [];
+      if ($payment_methods !== '') {
+        $payment_items = array_filter(array_map('trim', preg_split('/[\r\n]+/', $payment_methods)));
+        if (empty($payment_items)) {
+          $payment_items = [$payment_methods];
+        }
+      }
       $detail_label = isset($entry['detail_label']) ? $entry['detail_label'] : '';
       $detail_url = isset($entry['detail_url']) ? $entry['detail_url'] : '';
       $detail_url = gachasoku_apply_affiliate_url($detail_url);
@@ -145,6 +153,20 @@ function gachasoku_render_ranking_list($entries = null, $args = []) {
             <?php endif; ?>
             <?php if ($content) : ?>
               <div class="ranking-card__content"><?php echo wpautop(wp_kses_post($content)); ?></div>
+            <?php endif; ?>
+            <?php if (!empty($payment_items)) : ?>
+              <div class="ranking-card__payment">
+                <span class="ranking-card__payment-label">支払い方法</span>
+                <?php if (count($payment_items) > 1) : ?>
+                  <ul class="ranking-card__payment-list">
+                    <?php foreach ($payment_items as $method) : ?>
+                      <li><?php echo esc_html($method); ?></li>
+                    <?php endforeach; ?>
+                  </ul>
+                <?php else : ?>
+                  <span class="ranking-card__payment-single"><?php echo esc_html($payment_items[0]); ?></span>
+                <?php endif; ?>
+              </div>
             <?php endif; ?>
             <div class="ranking-card__actions">
               <?php if ($detail_label && $detail_url) : ?>
@@ -188,12 +210,23 @@ function gachasoku_save_ranking_entries($raw_entries) {
     $image_url = isset($entry['image_url']) ? esc_url_raw($entry['image_url']) : '';
     $image_link = isset($entry['image_link']) ? esc_url_raw($entry['image_link']) : '';
     $content = isset($entry['content']) ? wp_kses_post($entry['content']) : '';
+    $payment_methods = isset($entry['payment_methods']) ? sanitize_textarea_field($entry['payment_methods']) : '';
     $detail_label = isset($entry['detail_label']) ? sanitize_text_field($entry['detail_label']) : '';
     $detail_url = isset($entry['detail_url']) ? esc_url_raw($entry['detail_url']) : '';
     $official_label = isset($entry['official_label']) ? sanitize_text_field($entry['official_label']) : '';
     $official_url = isset($entry['official_url']) ? esc_url_raw($entry['official_url']) : '';
 
-    if ($position === '' && $image_url === '' && $image_link === '' && $content === '' && $detail_label === '' && $detail_url === '' && $official_label === '' && $official_url === '') {
+    if (
+      $position === ''
+      && $image_url === ''
+      && $image_link === ''
+      && $content === ''
+      && $payment_methods === ''
+      && $detail_label === ''
+      && $detail_url === ''
+      && $official_label === ''
+      && $official_url === ''
+    ) {
       continue;
     }
 
@@ -202,6 +235,7 @@ function gachasoku_save_ranking_entries($raw_entries) {
       'image_url' => $image_url,
       'image_link' => $image_link,
       'content' => $content,
+      'payment_methods' => $payment_methods,
       'detail_label' => $detail_label,
       'detail_url' => $detail_url,
       'official_label' => $official_label,
@@ -284,6 +318,7 @@ function gachasoku_render_ranking_entry_fields($index, $entry) {
   $image_url = isset($entry['image_url']) ? $entry['image_url'] : '';
   $image_link = isset($entry['image_link']) ? $entry['image_link'] : '';
   $content = isset($entry['content']) ? $entry['content'] : '';
+  $payment_methods = isset($entry['payment_methods']) ? $entry['payment_methods'] : '';
   $detail_label = isset($entry['detail_label']) ? $entry['detail_label'] : '';
   $detail_url = isset($entry['detail_url']) ? $entry['detail_url'] : '';
   $official_label = isset($entry['official_label']) ? $entry['official_label'] : '';
@@ -310,6 +345,10 @@ function gachasoku_render_ranking_entry_fields($index, $entry) {
       <label>
         内容
         <textarea name="gachasoku_ranking_entries[<?php echo esc_attr($index); ?>][content]" rows="4" placeholder="紹介文などを入力"><?php echo esc_textarea($content); ?></textarea>
+      </label>
+      <label>
+        支払い方法
+        <textarea name="gachasoku_ranking_entries[<?php echo esc_attr($index); ?>][payment_methods]" rows="3" placeholder="例: クレジットカード／PayPay／コンビニ払い&#10;改行で複数入力できます。"><?php echo esc_textarea($payment_methods); ?></textarea>
       </label>
       <div class="gachasoku-ranking-buttons">
         <div>
