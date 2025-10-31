@@ -14,11 +14,25 @@ if (!defined('GACHASOKU_MEMBER_STATUS_WITHDRAWN')) {
 }
 
 if (!defined('GACHASOKU_MEMBERSHIP_DB_VERSION')) {
-  define('GACHASOKU_MEMBERSHIP_DB_VERSION', '1.0.0');
+  define('GACHASOKU_MEMBERSHIP_DB_VERSION', '2.0.0');
 }
 
 if (!defined('GACHASOKU_MEMBERSHIP_PAGES_VERSION')) {
   define('GACHASOKU_MEMBERSHIP_PAGES_VERSION', '1.0.0');
+}
+
+if (!defined('GACHASOKU_MEMBER_SESSION_COOKIE')) {
+  define('GACHASOKU_MEMBER_SESSION_COOKIE', 'gachasoku_member_session');
+}
+
+function gachasoku_get_members_table() {
+  global $wpdb;
+  return $wpdb->prefix . 'gachasoku_members';
+}
+
+function gachasoku_get_member_sessions_table() {
+  global $wpdb;
+  return $wpdb->prefix . 'gachasoku_member_sessions';
 }
 
 function gachasoku_get_member_status_options() {
@@ -233,6 +247,330 @@ function gachasoku_membership_links_shortcode($atts = []) {
   return gachasoku_render_membership_links($atts['context']);
 }
 
+function gachasoku_get_member_by_id($member_id) {
+  $member_id = intval($member_id);
+  if (!$member_id) {
+    return null;
+  }
+
+  global $wpdb;
+  $table = gachasoku_get_members_table();
+  $member = $wpdb->get_row(
+    $wpdb->prepare("SELECT * FROM {$table} WHERE id = %d", $member_id),
+    ARRAY_A
+  );
+
+  return $member ?: null;
+}
+
+function gachasoku_get_member_by_email($email) {
+  $email = sanitize_email($email);
+  if (!$email) {
+    return null;
+  }
+
+  global $wpdb;
+  $table = gachasoku_get_members_table();
+  $member = $wpdb->get_row(
+    $wpdb->prepare("SELECT * FROM {$table} WHERE email = %s", $email),
+    ARRAY_A
+  );
+
+  return $member ?: null;
+}
+
+function gachasoku_prepare_member_record($member) {
+  if (!$member) {
+    return null;
+  }
+
+  return wp_parse_args($member, [
+    'id' => 0,
+    'name' => '',
+    'email' => '',
+    'status' => GACHASOKU_MEMBER_STATUS_ACTIVE,
+    'created_at' => '',
+    'updated_at' => '',
+    'last_login' => '',
+  ]);
+}
+
+function gachasoku_insert_member($name, $email, $password) {
+  $email = sanitize_email($email);
+  $name = wp_strip_all_tags($name);
+
+  if (!$email || !$name) {
+    return new WP_Error('invalid_member_data', '会員情報が正しく入力されていません。');
+  }
+
+  if (!is_email($email)) {
+    return new WP_Error('invalid_member_email', 'メールアドレスの形式が正しくありません。');
+  }
+
+  if (gachasoku_get_member_by_email($email)) {
+    return new WP_Error('member_exists', 'このメールアドレスは既に登録されています。');
+  }
+
+  $hash = wp_hash_password($password);
+  $now = current_time('mysql');
+
+  global $wpdb;
+  $table = gachasoku_get_members_table();
+
+  $inserted = $wpdb->insert(
+    $table,
+    [
+      'name' => $name,
+      'email' => $email,
+      'password_hash' => $hash,
+      'status' => GACHASOKU_MEMBER_STATUS_ACTIVE,
+      'created_at' => $now,
+      'updated_at' => $now,
+    ],
+    ['%s', '%s', '%s', '%s', '%s', '%s']
+  );
+
+  if (!$inserted) {
+    return new WP_Error('member_insert_failed', '会員情報の保存に失敗しました。時間を置いて再度お試しください。');
+  }
+
+  return intval($wpdb->insert_id);
+}
+
+function gachasoku_update_member($member_id, $data) {
+  $member = gachasoku_get_member_by_id($member_id);
+  if (!$member) {
+    return new WP_Error('member_not_found', '会員が見つかりません。');
+  }
+
+  $allowed = ['name', 'email', 'password_hash', 'status', 'last_login'];
+  $update = [];
+  $formats = [];
+
+  foreach ($allowed as $key) {
+    if (isset($data[$key])) {
+      $update[$key] = $data[$key];
+      $formats[] = '%s';
+    }
+  }
+
+  if (empty($update)) {
+    return true;
+  }
+
+  $update['updated_at'] = current_time('mysql');
+  $formats[] = '%s';
+
+  global $wpdb;
+  $table = gachasoku_get_members_table();
+  $result = $wpdb->update(
+    $table,
+    $update,
+    ['id' => $member['id']],
+    $formats,
+    ['%d']
+  );
+
+  if ($result === false) {
+    return new WP_Error('member_update_failed', '会員情報の更新に失敗しました。');
+  }
+
+  return true;
+}
+
+function gachasoku_update_member_email($member_id, $email) {
+  $email = sanitize_email($email);
+  if (!$email || !is_email($email)) {
+    return new WP_Error('invalid_member_email', 'メールアドレスの形式が正しくありません。');
+  }
+
+  $existing = gachasoku_get_member_by_email($email);
+  if ($existing && intval($existing['id']) !== intval($member_id)) {
+    return new WP_Error('member_exists', 'このメールアドレスは既に使用されています。');
+  }
+
+  return gachasoku_update_member($member_id, ['email' => $email]);
+}
+
+function gachasoku_update_member_password($member_id, $password) {
+  if ($password === '') {
+    return new WP_Error('invalid_member_password', 'パスワードが入力されていません。');
+  }
+
+  $hash = wp_hash_password($password);
+  return gachasoku_update_member($member_id, ['password_hash' => $hash]);
+}
+
+function gachasoku_get_member_status($member_id) {
+  $member = gachasoku_get_member_by_id($member_id);
+  if (!$member || empty($member['status'])) {
+    return GACHASOKU_MEMBER_STATUS_ACTIVE;
+  }
+  return $member['status'];
+}
+
+function gachasoku_set_member_status($member_id, $status) {
+  $options = gachasoku_get_member_status_options();
+  if (!isset($options[$status])) {
+    return false;
+  }
+
+  $result = gachasoku_update_member($member_id, ['status' => $status]);
+  return !is_wp_error($result);
+}
+
+function gachasoku_delete_member($member_id) {
+  global $wpdb;
+  $table = gachasoku_get_members_table();
+  $member_id = intval($member_id);
+  if (!$member_id) {
+    return false;
+  }
+
+  $deleted = $wpdb->delete($table, ['id' => $member_id], ['%d']);
+  if ($deleted !== false) {
+    gachasoku_delete_member_sessions($member_id);
+    $entries_table = $wpdb->prefix . 'gachasoku_campaign_entries';
+    $wpdb->delete($entries_table, ['user_id' => $member_id], ['%d']);
+  }
+  return $deleted !== false;
+}
+
+function gachasoku_generate_member_token() {
+  return wp_generate_password(64, false, false);
+}
+
+function gachasoku_delete_member_sessions($member_id) {
+  global $wpdb;
+  $table = gachasoku_get_member_sessions_table();
+  $wpdb->delete($table, ['member_id' => intval($member_id)], ['%d']);
+}
+
+function gachasoku_clear_member_cookie() {
+  $cookie_name = GACHASOKU_MEMBER_SESSION_COOKIE;
+  if (isset($_COOKIE[$cookie_name])) {
+    unset($_COOKIE[$cookie_name]);
+  }
+  $expire = time() - HOUR_IN_SECONDS;
+  setcookie($cookie_name, '', $expire, COOKIEPATH, COOKIE_DOMAIN, is_ssl(), true);
+  if (COOKIEPATH !== SITECOOKIEPATH) {
+    setcookie($cookie_name, '', $expire, SITECOOKIEPATH, COOKIE_DOMAIN, is_ssl(), true);
+  }
+}
+
+function gachasoku_member_login($member, $remember = false) {
+  $member = is_array($member) ? $member : gachasoku_get_member_by_id($member);
+  if (!$member) {
+    return false;
+  }
+
+  global $wpdb;
+  $table = gachasoku_get_member_sessions_table();
+
+  $token = gachasoku_generate_member_token();
+  $lifetime = $remember ? MONTH_IN_SECONDS : WEEK_IN_SECONDS;
+  $created = current_time('mysql');
+  $expires_timestamp = current_time('timestamp') + $lifetime;
+  $expires = wp_date('Y-m-d H:i:s', $expires_timestamp);
+
+  $wpdb->insert(
+    $table,
+    [
+      'member_id' => intval($member['id']),
+      'session_token' => $token,
+      'created_at' => $created,
+      'expires_at' => $expires,
+      'remember' => $remember ? 1 : 0,
+      'user_agent' => isset($_SERVER['HTTP_USER_AGENT']) ? substr(wp_unslash($_SERVER['HTTP_USER_AGENT']), 0, 191) : '',
+      'ip_address' => isset($_SERVER['REMOTE_ADDR']) ? substr(wp_unslash($_SERVER['REMOTE_ADDR']), 0, 100) : '',
+    ],
+    ['%d', '%s', '%s', '%s', '%d', '%s', '%s']
+  );
+
+  $expire_cookie = $expires_timestamp;
+  setcookie(GACHASOKU_MEMBER_SESSION_COOKIE, $token, $expire_cookie, COOKIEPATH, COOKIE_DOMAIN, is_ssl(), true);
+  if (COOKIEPATH !== SITECOOKIEPATH) {
+    setcookie(GACHASOKU_MEMBER_SESSION_COOKIE, $token, $expire_cookie, SITECOOKIEPATH, COOKIE_DOMAIN, is_ssl(), true);
+  }
+
+  gachasoku_update_member($member['id'], ['last_login' => $created]);
+  gachasoku_get_current_member(true);
+
+  return true;
+}
+
+function gachasoku_member_logout() {
+  $token = isset($_COOKIE[GACHASOKU_MEMBER_SESSION_COOKIE]) ? sanitize_text_field(wp_unslash($_COOKIE[GACHASOKU_MEMBER_SESSION_COOKIE])) : '';
+  if ($token) {
+    global $wpdb;
+    $table = gachasoku_get_member_sessions_table();
+    $wpdb->delete($table, ['session_token' => $token], ['%s']);
+  }
+  gachasoku_clear_member_cookie();
+  gachasoku_get_current_member(true);
+}
+
+function gachasoku_get_current_member($force_refresh = false) {
+  static $member = null;
+  static $checked = false;
+
+  if ($force_refresh) {
+    $member = null;
+    $checked = false;
+  }
+
+  if ($checked) {
+    return $member;
+  }
+
+  $checked = true;
+
+  $token = isset($_COOKIE[GACHASOKU_MEMBER_SESSION_COOKIE]) ? sanitize_text_field(wp_unslash($_COOKIE[GACHASOKU_MEMBER_SESSION_COOKIE])) : '';
+  if (!$token) {
+    return null;
+  }
+
+  global $wpdb;
+  $table = gachasoku_get_member_sessions_table();
+  $session = $wpdb->get_row(
+    $wpdb->prepare("SELECT * FROM {$table} WHERE session_token = %s", $token),
+    ARRAY_A
+  );
+
+  if (!$session) {
+    gachasoku_clear_member_cookie();
+    return null;
+  }
+
+  if (strtotime($session['expires_at']) < current_time('timestamp')) {
+    $wpdb->delete($table, ['session_token' => $token], ['%s']);
+    gachasoku_clear_member_cookie();
+    return null;
+  }
+
+  $member = gachasoku_get_member_by_id($session['member_id']);
+  if (!$member) {
+    $wpdb->delete($table, ['session_token' => $token], ['%s']);
+    gachasoku_clear_member_cookie();
+    return null;
+  }
+
+  return gachasoku_prepare_member_record($member);
+}
+
+function gachasoku_get_current_member_id() {
+  $member = gachasoku_get_current_member();
+  return $member ? intval($member['id']) : 0;
+}
+
+function gachasoku_is_member_logged_in() {
+  return (bool) gachasoku_get_current_member();
+}
+
+function gachasoku_get_member_logout_url() {
+  return wp_nonce_url(add_query_arg('gachasoku_member_logout', '1'), 'gachasoku_member_logout');
+}
+
 function gachasoku_register_member_role() {
   add_role(
     'gachasoku_member',
@@ -254,8 +592,37 @@ function gachasoku_install_membership_tables() {
   require_once ABSPATH . 'wp-admin/includes/upgrade.php';
 
   $charset_collate = $wpdb->get_charset_collate();
+  $members_table = gachasoku_get_members_table();
+  $sessions_table = gachasoku_get_member_sessions_table();
   $entries_table = $wpdb->prefix . 'gachasoku_campaign_entries';
   $logs_table = $wpdb->prefix . 'gachasoku_campaign_draw_logs';
+
+  $members_sql = "CREATE TABLE {$members_table} (
+    id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+    name varchar(191) NOT NULL,
+    email varchar(191) NOT NULL,
+    password_hash varchar(255) NOT NULL,
+    status varchar(20) NOT NULL DEFAULT 'active',
+    created_at datetime NOT NULL,
+    updated_at datetime NOT NULL,
+    last_login datetime DEFAULT NULL,
+    PRIMARY KEY  (id),
+    UNIQUE KEY email (email)
+  ) {$charset_collate};";
+
+  $sessions_sql = "CREATE TABLE {$sessions_table} (
+    id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+    member_id bigint(20) unsigned NOT NULL,
+    session_token varchar(191) NOT NULL,
+    remember tinyint(1) NOT NULL DEFAULT 0,
+    user_agent varchar(191) DEFAULT NULL,
+    ip_address varchar(100) DEFAULT NULL,
+    created_at datetime NOT NULL,
+    expires_at datetime NOT NULL,
+    PRIMARY KEY (id),
+    UNIQUE KEY session_token (session_token),
+    KEY member_id (member_id)
+  ) {$charset_collate};";
 
   $entries_sql = "CREATE TABLE {$entries_table} (
     id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
@@ -283,10 +650,76 @@ function gachasoku_install_membership_tables() {
     KEY executed_at (executed_at)
   ) {$charset_collate};";
 
+  dbDelta($members_sql);
+  dbDelta($sessions_sql);
   dbDelta($entries_sql);
   dbDelta($logs_sql);
 
+  gachasoku_migrate_existing_wp_members();
+
   update_option('gachasoku_membership_db_version', GACHASOKU_MEMBERSHIP_DB_VERSION);
+}
+
+function gachasoku_migrate_existing_wp_members() {
+  if (get_option('gachasoku_membership_migrated')) {
+    return;
+  }
+
+  if (!function_exists('get_users')) {
+    return;
+  }
+
+  $wp_members = get_users([
+    'role' => 'gachasoku_member',
+    'number' => -1,
+  ]);
+
+  if (empty($wp_members)) {
+    update_option('gachasoku_membership_migrated', 1);
+    return;
+  }
+
+  global $wpdb;
+  $members_table = gachasoku_get_members_table();
+  $entries_table = $wpdb->prefix . 'gachasoku_campaign_entries';
+
+  foreach ($wp_members as $user) {
+    $status = get_user_meta($user->ID, '_gachasoku_member_status', true);
+    if (!$status) {
+      $status = GACHASOKU_MEMBER_STATUS_ACTIVE;
+    }
+
+    $existing = gachasoku_get_member_by_email($user->user_email);
+    if ($existing) {
+      $member_id = intval($existing['id']);
+    } else {
+      $member_id = intval($user->ID);
+      $wpdb->insert(
+        $members_table,
+        [
+          'id' => $member_id,
+          'name' => $user->display_name ?: $user->user_login,
+          'email' => $user->user_email,
+          'password_hash' => $user->user_pass,
+          'status' => $status,
+          'created_at' => $user->user_registered,
+          'updated_at' => current_time('mysql'),
+          'last_login' => $user->user_registered,
+        ],
+        ['%d', '%s', '%s', '%s', '%s', '%s', '%s', '%s']
+      );
+    }
+
+    $wpdb->update(
+      $entries_table,
+      ['user_id' => $member_id],
+      ['user_id' => $user->ID],
+      ['%d'],
+      ['%d']
+    );
+  }
+
+  update_option('gachasoku_membership_migrated', 1);
 }
 
 add_action('init', 'gachasoku_register_campaign_post_type');
@@ -475,47 +908,6 @@ function gachasoku_enqueue_campaign_admin_assets($hook) {
   );
 }
 
-function gachasoku_get_member_status($user_id) {
-  $status = get_user_meta($user_id, '_gachasoku_member_status', true);
-  if (!$status) {
-    $status = GACHASOKU_MEMBER_STATUS_ACTIVE;
-  }
-  return $status;
-}
-
-function gachasoku_set_member_status($user_id, $status) {
-  $options = gachasoku_get_member_status_options();
-  if (!isset($options[$status])) {
-    return false;
-  }
-  update_user_meta($user_id, '_gachasoku_member_status', $status);
-  return true;
-}
-
-add_action('user_register', 'gachasoku_set_default_member_status');
-function gachasoku_set_default_member_status($user_id) {
-  if (gachasoku_get_member_status($user_id) === GACHASOKU_MEMBER_STATUS_ACTIVE) {
-    return;
-  }
-  gachasoku_set_member_status($user_id, GACHASOKU_MEMBER_STATUS_ACTIVE);
-}
-
-add_filter('wp_authenticate_user', 'gachasoku_block_inactive_members', 10, 2);
-function gachasoku_block_inactive_members($user, $password) {
-  if (!$user instanceof WP_User) {
-    return $user;
-  }
-
-  $status = gachasoku_get_member_status($user->ID);
-  if ($status === GACHASOKU_MEMBER_STATUS_ACTIVE) {
-    return $user;
-  }
-
-  $labels = gachasoku_get_member_status_options();
-  $label = isset($labels[$status]) ? $labels[$status] : '利用不可';
-  return new WP_Error('gachasoku_inactive_member', sprintf('アカウントは現在「%s」です。管理者にお問い合わせください。', $label));
-}
-
 function gachasoku_get_membership_messages($context) {
   if (!isset($GLOBALS['gachasoku_membership_messages'])) {
     $GLOBALS['gachasoku_membership_messages'] = [];
@@ -557,6 +949,19 @@ function gachasoku_render_membership_messages($context) {
 
 add_action('init', 'gachasoku_handle_membership_requests');
 function gachasoku_handle_membership_requests() {
+  if (isset($_GET['gachasoku_member_logout'])) {
+    $nonce = isset($_GET['_wpnonce']) ? $_GET['_wpnonce'] : '';
+    if (wp_verify_nonce($nonce, 'gachasoku_member_logout')) {
+      gachasoku_member_logout();
+      $redirect = remove_query_arg(['gachasoku_member_logout', '_wpnonce']);
+      if (!$redirect || $redirect === '') {
+        $redirect = home_url('/');
+      }
+      wp_safe_redirect($redirect);
+      exit;
+    }
+  }
+
   if (!empty($_POST['gachasoku_register_submit'])) {
     gachasoku_handle_registration();
   }
@@ -605,32 +1010,21 @@ function gachasoku_handle_registration() {
     return;
   }
 
-  if (email_exists($email) || username_exists($email)) {
+  if (gachasoku_get_member_by_email($email)) {
     gachasoku_add_membership_message('register', 'error', 'このメールアドレスは既に登録されています。');
     return;
   }
 
-  $user_id = wp_create_user($email, $password, $email);
-  if (is_wp_error($user_id)) {
-    gachasoku_add_membership_message('register', 'error', $user_id->get_error_message());
+  $member_id = gachasoku_insert_member($name, $email, $password);
+  if (is_wp_error($member_id)) {
+    gachasoku_add_membership_message('register', 'error', $member_id->get_error_message());
     return;
   }
 
-  wp_update_user([
-    'ID' => $user_id,
-    'display_name' => $name,
-    'nickname' => $name,
-  ]);
-
-  $user = get_user_by('id', $user_id);
-  if ($user instanceof WP_User) {
-    $user->set_role('gachasoku_member');
+  $member = gachasoku_get_member_by_id($member_id);
+  if ($member) {
+    gachasoku_member_login($member);
   }
-
-  gachasoku_set_member_status($user_id, GACHASOKU_MEMBER_STATUS_ACTIVE);
-
-  wp_set_current_user($user_id);
-  wp_set_auth_cookie($user_id);
 
   gachasoku_add_membership_message('register', 'success', '会員登録が完了しました。マイページからキャンペーンに応募できます。');
 }
@@ -650,17 +1044,27 @@ function gachasoku_handle_login() {
     return;
   }
 
-  $creds = [
-    'user_login' => $email,
-    'user_password' => $password,
-    'remember' => !empty($_POST['gachasoku_login_remember']),
-  ];
-
-  $user = wp_signon($creds, false);
-  if (is_wp_error($user)) {
-    gachasoku_add_membership_message('login', 'error', $user->get_error_message());
+  $member = gachasoku_get_member_by_email($email);
+  if (!$member || empty($member['password_hash'])) {
+    gachasoku_add_membership_message('login', 'error', 'メールアドレスまたはパスワードが正しくありません。');
     return;
   }
+
+  if (!wp_check_password($password, $member['password_hash'])) {
+    gachasoku_add_membership_message('login', 'error', 'メールアドレスまたはパスワードが正しくありません。');
+    return;
+  }
+
+  $status = isset($member['status']) ? $member['status'] : GACHASOKU_MEMBER_STATUS_ACTIVE;
+  if ($status !== GACHASOKU_MEMBER_STATUS_ACTIVE) {
+    $labels = gachasoku_get_member_status_options();
+    $label = isset($labels[$status]) ? $labels[$status] : '利用不可';
+    gachasoku_add_membership_message('login', 'error', sprintf('アカウントは現在「%s」です。管理者にお問い合わせください。', $label));
+    return;
+  }
+
+  $remember = !empty($_POST['gachasoku_login_remember']);
+  gachasoku_member_login($member, $remember);
 
   gachasoku_add_membership_message('login', 'success', 'ログインに成功しました。');
 }
@@ -678,23 +1082,44 @@ function gachasoku_handle_password_reset() {
     return;
   }
 
-  $user = get_user_by('email', $email);
-  if (!$user) {
-    gachasoku_add_membership_message('password', 'error', '該当するユーザーが見つかりません。');
+  $member = gachasoku_get_member_by_email($email);
+  if (!$member) {
+    gachasoku_add_membership_message('password', 'error', '該当する会員が見つかりません。');
     return;
   }
 
-  $result = retrieve_password($user->user_login);
-  if ($result === true) {
+  $temporary_password = wp_generate_password(12, false);
+  $updated = gachasoku_update_member_password($member['id'], $temporary_password);
+
+  if (is_wp_error($updated)) {
+    gachasoku_add_membership_message('password', 'error', $updated->get_error_message());
+    return;
+  }
+
+  $login_url = gachasoku_get_membership_page_url('member-login');
+  $blogname = wp_specialchars_decode(get_option('blogname'), ENT_QUOTES);
+  $subject = sprintf('【%s】パスワード再設定のお知らせ', $blogname);
+  $message = [];
+  $message[] = $member['name'] ? sprintf('%s 様', $member['name']) : '会員様';
+  $message[] = '';
+  $message[] = 'パスワード再設定のご依頼を受け付けました。';
+  $message[] = '下記の仮パスワードでログインのうえ、マイページからお好きなパスワードに変更してください。';
+  $message[] = '';
+  $message[] = '仮パスワード: ' . $temporary_password;
+  $message[] = 'ログインページ: ' . $login_url;
+  $message[] = '';
+  $message[] = '※このメールに心当たりがない場合は破棄してください。';
+  $mail_sent = wp_mail($member['email'], $subject, implode("\n", $message));
+
+  if ($mail_sent) {
     gachasoku_add_membership_message('password', 'success', 'パスワード再設定メールを送信しました。メールをご確認ください。');
   } else {
-    $message = is_wp_error($result) ? $result->get_error_message() : 'メール送信に失敗しました。時間を置いて再度お試しください。';
-    gachasoku_add_membership_message('password', 'error', $message);
+    gachasoku_add_membership_message('password', 'error', 'メール送信に失敗しました。時間を置いて再度お試しください。');
   }
 }
 
 function gachasoku_handle_email_update() {
-  if (!is_user_logged_in()) {
+  if (!gachasoku_is_member_logged_in()) {
     gachasoku_add_membership_message('dashboard', 'error', 'ログインが必要です。');
     return;
   }
@@ -716,33 +1141,25 @@ function gachasoku_handle_email_update() {
     return;
   }
 
-  $current_user = wp_get_current_user();
-  if (!$current_user instanceof WP_User) {
-    gachasoku_add_membership_message('dashboard', 'error', 'ユーザー情報を取得できませんでした。');
+  $member = gachasoku_get_current_member();
+  if (!$member) {
+    gachasoku_add_membership_message('dashboard', 'error', '会員情報を取得できませんでした。');
     return;
   }
 
-  if ($current_user->user_email === $email) {
+  if ($member['email'] === $email) {
     gachasoku_add_membership_message('dashboard', 'success', 'メールアドレスは既に更新済みです。');
     return;
   }
 
-  if (email_exists($email)) {
-    gachasoku_add_membership_message('dashboard', 'error', 'このメールアドレスは既に使用されています。');
-    return;
-  }
-
-  $result = wp_update_user([
-    'ID' => $current_user->ID,
-    'user_email' => $email,
-    'user_login' => $email,
-  ]);
+  $result = gachasoku_update_member_email($member['id'], $email);
 
   if (is_wp_error($result)) {
     gachasoku_add_membership_message('dashboard', 'error', $result->get_error_message());
     return;
   }
 
+  gachasoku_get_current_member(true);
   gachasoku_add_membership_message('dashboard', 'success', 'メールアドレスを更新しました。');
 }
 
@@ -753,12 +1170,12 @@ function gachasoku_handle_campaign_application() {
     return;
   }
 
-  if (!is_user_logged_in()) {
+  if (!gachasoku_is_member_logged_in()) {
     gachasoku_add_membership_message('campaign', 'error', '応募にはログインが必要です。');
     return;
   }
 
-  $user_id = get_current_user_id();
+  $user_id = gachasoku_get_current_member_id();
   $status = gachasoku_get_member_status($user_id);
   if ($status !== GACHASOKU_MEMBER_STATUS_ACTIVE) {
     gachasoku_add_membership_message('campaign', 'error', '現在のステータスでは応募できません。');
@@ -981,9 +1398,9 @@ function gachasoku_log_campaign_draw($campaign_id, $winner_ids, $notes = '') {
 function gachasoku_get_campaign_winner_usernames($winner_ids) {
   $names = [];
   foreach ($winner_ids as $winner_id) {
-    $user = get_user_by('id', $winner_id);
-    if ($user) {
-      $names[] = $user->display_name ? $user->display_name : $user->user_email;
+    $member = gachasoku_get_member_by_id($winner_id);
+    if ($member) {
+      $names[] = $member['name'] ? $member['name'] : $member['email'];
     }
   }
   return $names;
@@ -1016,7 +1433,7 @@ function gachasoku_select_campaign_winners($campaign_id, $max_winners) {
 
 add_shortcode('gachasoku_register_form', 'gachasoku_register_form_shortcode');
 function gachasoku_register_form_shortcode() {
-  if (is_user_logged_in()) {
+  if (gachasoku_is_member_logged_in()) {
     return '<p class="gachasoku-membership__notice">既にログイン済みです。</p>';
   }
 
@@ -1053,7 +1470,7 @@ function gachasoku_register_form_shortcode() {
 
 add_shortcode('gachasoku_login_form', 'gachasoku_login_form_shortcode');
 function gachasoku_login_form_shortcode() {
-  if (is_user_logged_in()) {
+  if (gachasoku_is_member_logged_in()) {
     return '<p class="gachasoku-membership__notice">既にログイン済みです。</p>';
   }
 
@@ -1109,13 +1526,19 @@ function gachasoku_password_reset_form_shortcode() {
 
 add_shortcode('gachasoku_member_dashboard', 'gachasoku_member_dashboard_shortcode');
 function gachasoku_member_dashboard_shortcode() {
-  if (!is_user_logged_in()) {
+  if (!gachasoku_is_member_logged_in()) {
     return '<p class="gachasoku-membership__notice">マイページを閲覧するにはログインしてください。</p>';
   }
 
-  $user = wp_get_current_user();
-  $status = gachasoku_get_member_status($user->ID);
-  $grouped = gachasoku_get_campaign_entries_grouped($user->ID);
+  $member = gachasoku_get_current_member();
+  if (!$member) {
+    return '<p class="gachasoku-membership__notice">会員情報を取得できませんでした。</p>';
+  }
+
+  $status = gachasoku_get_member_status($member['id']);
+  $status_options = gachasoku_get_member_status_options();
+  $status_label = isset($status_options[$status]) ? $status_options[$status] : $status;
+  $grouped = gachasoku_get_campaign_entries_grouped($member['id']);
 
   ob_start();
   echo gachasoku_render_membership_messages('dashboard');
@@ -1126,15 +1549,15 @@ function gachasoku_member_dashboard_shortcode() {
       <dl class="gachasoku-dashboard__profile">
         <div>
           <dt>お名前</dt>
-          <dd><?php echo esc_html($user->display_name); ?></dd>
+          <dd><?php echo esc_html($member['name']); ?></dd>
         </div>
         <div>
           <dt>メールアドレス</dt>
-          <dd><?php echo esc_html($user->user_email); ?></dd>
+          <dd><?php echo esc_html($member['email']); ?></dd>
         </div>
         <div>
           <dt>ステータス</dt>
-          <dd><?php echo esc_html(gachasoku_get_member_status_options()[$status]); ?></dd>
+          <dd><?php echo esc_html($status_label); ?></dd>
         </div>
       </dl>
       <form method="post" class="gachasoku-form gachasoku-dashboard__form">
@@ -1276,7 +1699,7 @@ function gachasoku_campaigns_shortcode($atts = []) {
         continue;
       }
 
-      $user_id = get_current_user_id();
+      $user_id = gachasoku_get_current_member_id();
       $has_applied = false;
       if ($user_id) {
         $has_applied = gachasoku_user_has_applied(get_the_ID(), $user_id);
@@ -1336,7 +1759,7 @@ function gachasoku_user_has_applied($campaign_id, $user_id) {
 }
 
 function gachasoku_render_campaign_action($campaign_id, $card, $has_applied) {
-  if (!is_user_logged_in()) {
+  if (!gachasoku_is_member_logged_in()) {
     return '<p class="gachasoku-campaign-card__notice">応募するにはログインしてください。</p>';
   }
 
@@ -1348,7 +1771,7 @@ function gachasoku_render_campaign_action($campaign_id, $card, $has_applied) {
     return '<p class="gachasoku-campaign-card__notice">応募済みです。</p>';
   }
 
-  $status = gachasoku_get_member_status(get_current_user_id());
+  $status = gachasoku_get_member_status(gachasoku_get_current_member_id());
   if ($status !== GACHASOKU_MEMBER_STATUS_ACTIVE) {
     return '<p class="gachasoku-campaign-card__notice">現在のステータスでは応募できません。</p>';
   }
@@ -1414,21 +1837,32 @@ function gachasoku_render_member_admin_page() {
   $search = isset($_GET['s']) ? sanitize_text_field(wp_unslash($_GET['s'])) : '';
   $status_filter = isset($_GET['status']) ? sanitize_text_field(wp_unslash($_GET['status'])) : '';
 
-  $args = [
-    'role' => 'gachasoku_member',
-    'number' => 50,
-    'search' => $search ? '*' . $search . '*' : null,
-    'search_columns' => ['user_login', 'user_email', 'display_name'],
-  ];
+  global $wpdb;
+  $table = gachasoku_get_members_table();
+  $statuses = gachasoku_get_member_status_options();
+  $where = [];
+  $params = [];
 
-  if ($status_filter) {
-    $args['meta_key'] = '_gachasoku_member_status';
-    $args['meta_value'] = $status_filter;
+  if ($search) {
+    $like = '%' . $wpdb->esc_like($search) . '%';
+    $where[] = '(name LIKE %s OR email LIKE %s)';
+    $params[] = $like;
+    $params[] = $like;
   }
 
-  $user_query = new WP_User_Query($args);
-  $users = $user_query->get_results();
-  $statuses = gachasoku_get_member_status_options();
+  if ($status_filter && isset($statuses[$status_filter])) {
+    $where[] = 'status = %s';
+    $params[] = $status_filter;
+  }
+
+  $sql = "SELECT * FROM {$table}";
+  if ($where) {
+    $sql .= ' WHERE ' . implode(' AND ', $where);
+  }
+  $sql .= ' ORDER BY created_at DESC LIMIT 100';
+
+  $query = $params ? $wpdb->prepare($sql, $params) : $sql;
+  $users = $wpdb->get_results($query, ARRAY_A);
 
   ?>
   <div class="wrap gachasoku-member-admin">
@@ -1460,15 +1894,15 @@ function gachasoku_render_member_admin_page() {
       <tbody>
         <?php if (!empty($users)) : ?>
           <?php foreach ($users as $user) :
-            $status = gachasoku_get_member_status($user->ID);
+            $status = $user['status'];
             ?>
             <tr>
-              <td><?php echo esc_html($user->display_name); ?></td>
-              <td><?php echo esc_html($user->user_email); ?></td>
+              <td><?php echo esc_html($user['name']); ?></td>
+              <td><?php echo esc_html($user['email']); ?></td>
               <td>
                 <form method="post" class="gachasoku-member-admin__inline-form">
-                  <?php wp_nonce_field('gachasoku_member_update_' . $user->ID, 'gachasoku_member_nonce'); ?>
-                  <input type="hidden" name="user_id" value="<?php echo esc_attr($user->ID); ?>" />
+                  <?php wp_nonce_field('gachasoku_member_update_' . $user['id'], 'gachasoku_member_nonce'); ?>
+                  <input type="hidden" name="user_id" value="<?php echo esc_attr($user['id']); ?>" />
                   <select name="member_status">
                     <?php foreach ($statuses as $value => $label) : ?>
                       <option value="<?php echo esc_attr($value); ?>" <?php selected($status, $value); ?>><?php echo esc_html($label); ?></option>
@@ -1477,14 +1911,13 @@ function gachasoku_render_member_admin_page() {
                   <button type="submit" name="gachasoku_member_action" value="update_status" class="button">更新</button>
                 </form>
               </td>
-              <td><?php echo esc_html(gachasoku_format_datetime($user->user_registered)); ?></td>
+              <td><?php echo esc_html(gachasoku_format_datetime($user['created_at'])); ?></td>
               <td>
                 <form method="post" class="gachasoku-member-admin__inline-form" onsubmit="return confirm('この会員を削除しますか？');">
-                  <?php wp_nonce_field('gachasoku_member_delete_' . $user->ID, 'gachasoku_member_nonce'); ?>
-                  <input type="hidden" name="user_id" value="<?php echo esc_attr($user->ID); ?>" />
+                  <?php wp_nonce_field('gachasoku_member_delete_' . $user['id'], 'gachasoku_member_nonce'); ?>
+                  <input type="hidden" name="user_id" value="<?php echo esc_attr($user['id']); ?>" />
                   <button type="submit" name="gachasoku_member_action" value="delete" class="button button-secondary">削除</button>
                 </form>
-                <a class="button-link" href="<?php echo esc_url(get_edit_user_link($user->ID)); ?>">プロフィール編集</a>
               </td>
             </tr>
           <?php endforeach; ?>
@@ -1531,14 +1964,11 @@ function gachasoku_handle_member_admin_actions() {
       return;
     }
 
-    if ($user_id === get_current_user_id()) {
-      add_settings_error('gachasoku_member_admin', 'self_delete', '自分自身は削除できません。', 'error');
-      return;
+    if (gachasoku_delete_member($user_id)) {
+      add_settings_error('gachasoku_member_admin', 'deleted', '会員を削除しました。', 'updated');
+    } else {
+      add_settings_error('gachasoku_member_admin', 'delete_failed', '会員の削除に失敗しました。', 'error');
     }
-
-    require_once ABSPATH . 'wp-admin/includes/user.php';
-    wp_delete_user($user_id);
-    add_settings_error('gachasoku_member_admin', 'deleted', '会員を削除しました。', 'updated');
   }
 }
 

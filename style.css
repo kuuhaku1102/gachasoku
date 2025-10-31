@@ -127,6 +127,45 @@ body {
   align-items: center;
 }
 
+.site-header__membership {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-left: 24px;
+}
+
+.site-header__membership-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.45rem 1.1rem;
+  border-radius: 999px;
+  background: var(--dark-gray);
+  color: #fff;
+  font-weight: 600;
+  font-size: 0.95rem;
+  text-decoration: none;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+.site-header__membership-link:hover,
+.site-header__membership-link:focus {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.16);
+  background: #1f1f1f;
+  color: #fff;
+}
+
+.site-header__membership-link--logout {
+  background: rgba(42, 42, 42, 0.72);
+}
+
+.site-header__membership-link--logout:hover,
+.site-header__membership-link--logout:focus {
+  background: rgba(42, 42, 42, 0.92);
+}
+
 .site-header__menu {
   list-style: none;
   display: flex;
@@ -254,6 +293,20 @@ footer p {
 
   .site-header__nav.is-open {
     display: block;
+  }
+
+  .site-header__membership {
+    order: 4;
+    width: 100%;
+    margin-left: 0;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .site-header__membership-link {
+    flex: 1 1 160px;
+    justify-content: center;
   }
 
   .site-header__menu {

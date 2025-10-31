@@ -38,6 +38,15 @@
       ]);
       ?>
     </nav>
+    <div class="site-header__membership">
+      <?php if (function_exists('gachasoku_is_member_logged_in') && gachasoku_is_member_logged_in()) : ?>
+        <a class="site-header__membership-link" href="<?php echo esc_url(gachasoku_get_membership_page_url('member-dashboard')); ?>">マイページ</a>
+        <a class="site-header__membership-link site-header__membership-link--logout" href="<?php echo esc_url(gachasoku_get_member_logout_url()); ?>">ログアウト</a>
+      <?php else : ?>
+        <a class="site-header__membership-link" href="<?php echo esc_url(gachasoku_get_membership_page_url('member-register')); ?>">会員登録</a>
+        <a class="site-header__membership-link" href="<?php echo esc_url(gachasoku_get_membership_page_url('member-login')); ?>">ログイン</a>
+      <?php endif; ?>
+    </div>
   </div>
 </header>
 <main class="container">
