@@ -6,6 +6,7 @@
 <?php wp_head(); ?>
 </head>
 <body <?php body_class(); ?>>
+  テスト
 <header>
   <div class="container">
     <h1><a href="<?php echo esc_url(home_url('/')); ?>"> <?php bloginfo('name'); ?></a></h1>
@@ -14,3 +15,4 @@
   </div>
 </header>
 <main class="container">
+
