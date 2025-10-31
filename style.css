@@ -1199,3 +1199,389 @@ footer p {
     color: #6b7280;
   }
 }
+
+.gachasoku-messages {
+  margin-bottom: 24px;
+  display: grid;
+  gap: 12px;
+}
+
+.gachasoku-message {
+  padding: 16px 18px;
+  border-radius: 10px;
+  font-weight: 600;
+  box-shadow: 0 8px 20px rgba(0,0,0,0.05);
+}
+
+.gachasoku-message--success {
+  background: #ecfdf5;
+  color: #047857;
+  border: 1px solid rgba(5, 150, 105, 0.2);
+}
+
+.gachasoku-message--error {
+  background: #fef2f2;
+  color: #b91c1c;
+  border: 1px solid rgba(185, 28, 28, 0.2);
+}
+
+.gachasoku-membership__notice {
+  background: rgba(255, 222, 89, 0.15);
+  border: 1px solid rgba(255, 198, 10, 0.35);
+  padding: 20px;
+  border-radius: 12px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.gachasoku-form {
+  background: #fff;
+  padding: 28px;
+  border-radius: 16px;
+  box-shadow: 0 15px 40px rgba(0,0,0,0.07);
+  display: grid;
+  gap: 18px;
+}
+
+.gachasoku-form__field {
+  display: grid;
+  gap: 8px;
+}
+
+.gachasoku-form__field label {
+  font-weight: 700;
+  color: #1f2937;
+}
+
+.gachasoku-form__field input,
+.gachasoku-form__field textarea,
+.gachasoku-form__field select {
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  font-size: 1rem;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.gachasoku-form__field input:focus,
+.gachasoku-form__field textarea:focus,
+.gachasoku-form__field select:focus {
+  border-color: #facc15;
+  box-shadow: 0 0 0 3px rgba(250, 204, 21, 0.35);
+  outline: none;
+}
+
+.gachasoku-form__field--checkbox label {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 500;
+}
+
+.gachasoku-form__field--checkbox input[type="checkbox"] {
+  width: auto;
+  accent-color: #facc15;
+}
+
+.gachasoku-form__actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.gachasoku-button {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 22px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #ffd633, #ffb800);
+  color: #1a1a1a;
+  font-weight: 700;
+  border: none;
+  text-decoration: none;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.gachasoku-button:hover,
+.gachasoku-button:focus {
+  transform: translateY(-1px);
+  box-shadow: 0 12px 25px rgba(255, 184, 0, 0.4);
+  outline: none;
+}
+
+.gachasoku-button--outline {
+  background: transparent;
+  border: 2px solid rgba(255, 184, 0, 0.6);
+  color: #b7791f;
+}
+
+.gachasoku-button--outline:hover,
+.gachasoku-button--outline:focus {
+  background: rgba(255, 223, 89, 0.2);
+  box-shadow: none;
+}
+
+.gachasoku-campaigns {
+  display: grid;
+  gap: 28px;
+}
+
+.gachasoku-campaigns__empty {
+  text-align: center;
+  padding: 40px;
+  background: #fffbe6;
+  border-radius: 16px;
+  border: 1px dashed rgba(250, 204, 21, 0.6);
+  font-weight: 600;
+}
+
+.gachasoku-campaign-card {
+  background: #fff;
+  border-radius: 18px;
+  box-shadow: 0 20px 45px rgba(0,0,0,0.06);
+  overflow: hidden;
+  display: grid;
+  grid-template-columns: minmax(0, 260px) minmax(0, 1fr);
+  min-height: 260px;
+}
+
+.gachasoku-campaign-card__image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.gachasoku-campaign-card__body {
+  padding: 26px;
+  display: grid;
+  gap: 16px;
+}
+
+.gachasoku-campaign-card__title {
+  margin: 0;
+  font-size: 1.5rem;
+  color: #1f2937;
+}
+
+.gachasoku-campaign-card__dates {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 18px;
+  font-size: 0.95rem;
+  color: #4b5563;
+}
+
+.gachasoku-campaign-card__requirements {
+  background: rgba(255, 222, 89, 0.18);
+  border-radius: 12px;
+  padding: 16px;
+  border: 1px solid rgba(255, 184, 0, 0.4);
+}
+
+.gachasoku-campaign-card__requirements h4 {
+  margin: 0 0 8px 0;
+  font-size: 1rem;
+  color: #92400e;
+}
+
+.gachasoku-campaign-card__content {
+  font-size: 0.98rem;
+  color: #374151;
+}
+
+.gachasoku-campaign-card__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+
+.gachasoku-campaign-card__notice {
+  background: rgba(241, 245, 249, 0.9);
+  padding: 10px 16px;
+  border-radius: 999px;
+  font-weight: 600;
+  color: #475569;
+}
+
+.gachasoku-campaign-card__form {
+  display: inline-flex;
+}
+
+.gachasoku-dashboard {
+  display: grid;
+  gap: 36px;
+}
+
+.gachasoku-dashboard__section {
+  background: #fff;
+  padding: 30px;
+  border-radius: 18px;
+  box-shadow: 0 18px 40px rgba(0,0,0,0.05);
+  display: grid;
+  gap: 20px;
+}
+
+.gachasoku-dashboard__title {
+  margin: 0;
+  font-size: 1.45rem;
+  color: #111827;
+}
+
+.gachasoku-dashboard__profile {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+}
+
+.gachasoku-dashboard__profile div {
+  display: flex;
+  gap: 12px;
+  align-items: baseline;
+}
+
+.gachasoku-dashboard__profile dt {
+  font-weight: 700;
+  width: 120px;
+  color: #374151;
+}
+
+.gachasoku-dashboard__profile dd {
+  margin: 0;
+  color: #111827;
+  font-weight: 600;
+}
+
+.gachasoku-dashboard__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 16px;
+}
+
+.gachasoku-dashboard__item {
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  border-radius: 14px;
+  padding: 18px 20px;
+  display: grid;
+  gap: 12px;
+  background: #f9fafb;
+}
+
+.gachasoku-dashboard__item-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+}
+
+.gachasoku-dashboard__item-head h3 {
+  margin: 0;
+  font-size: 1.2rem;
+}
+
+.gachasoku-dashboard__link {
+  color: #b7791f;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.gachasoku-dashboard__link:hover,
+.gachasoku-dashboard__link:focus {
+  text-decoration: underline;
+}
+
+.gachasoku-dashboard__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 18px;
+  font-size: 0.92rem;
+  color: #4b5563;
+}
+
+.gachasoku-dashboard__result {
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 16px;
+  border-radius: 999px;
+}
+
+.gachasoku-dashboard__result.status-won {
+  background: rgba(34, 197, 94, 0.15);
+  color: #166534;
+}
+
+.gachasoku-dashboard__result.status-lost {
+  background: rgba(248, 113, 113, 0.2);
+  color: #b91c1c;
+}
+
+.gachasoku-dashboard__result.status-applied {
+  background: rgba(59, 130, 246, 0.15);
+  color: #1d4ed8;
+}
+
+.gachasoku-dashboard__result-date {
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.gachasoku-dashboard__empty {
+  background: rgba(241, 245, 249, 0.8);
+  padding: 18px 20px;
+  border-radius: 12px;
+  text-align: center;
+  color: #475569;
+  font-weight: 600;
+}
+
+@media (max-width: 960px) {
+  .gachasoku-campaign-card {
+    grid-template-columns: 1fr;
+  }
+
+  .gachasoku-campaign-card__image {
+    max-height: 220px;
+  }
+
+  .gachasoku-campaign-card__body {
+    padding: 22px;
+  }
+
+  .gachasoku-dashboard__profile div {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .gachasoku-dashboard__profile dt {
+    width: auto;
+  }
+}
+
+@media (max-width: 640px) {
+  .gachasoku-form {
+    padding: 22px;
+  }
+
+  .gachasoku-campaign-card__actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .gachasoku-button,
+  .gachasoku-button--outline {
+    width: 100%;
+  }
+
+  .gachasoku-dashboard__item-head {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
