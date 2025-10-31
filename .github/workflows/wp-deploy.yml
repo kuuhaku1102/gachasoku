@@ -24,6 +24,6 @@ jobs:
       - name: Deploy WordPress theme via rsync
         run: |
           rsync -avz --delete \
-          ./wp-content/themes/yellowsmile_complete/ \
+          ./ \
           c3659606@www1012.conoha.ne.jp:/home/c3659606/public_html/online-gacha-hack.com/wp-content/themes/yellowsmile_complete/ \
           -e "ssh -p 8022 -i ~/.ssh/id_ed25519"
