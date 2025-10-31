@@ -14,6 +14,29 @@ add_action('wp_enqueue_scripts', function() {
     '1.0.0',
     true
   );
+  wp_enqueue_script(
+    'gachasoku-membership',
+    get_template_directory_uri() . '/js/membership.js',
+    [],
+    '1.0.0',
+    true
+  );
+  wp_localize_script(
+    'gachasoku-membership',
+    'gachasokuMembership',
+    [
+      'ajaxUrl'  => admin_url('admin-ajax.php'),
+      'messages' => [
+        'genericError'  => 'エラーが発生しました。時間をおいて再度お試しください。',
+        'loginRequired' => '応募にはログインが必要です。',
+        'missingUrl'    => '応募先URLが見つかりません。',
+      ],
+      'labels'   => [
+        'applied' => '応募済み',
+        'visit'   => '公式サイトへ',
+      ],
+    ]
+  );
 });
 
 function gachasoku_get_archive_site_terms() {

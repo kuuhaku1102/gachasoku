@@ -1395,11 +1395,20 @@ footer p {
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
+.gachasoku-button.is-loading {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
 .gachasoku-button:hover,
 .gachasoku-button:focus {
   transform: translateY(-1px);
   box-shadow: 0 12px 25px rgba(255, 184, 0, 0.4);
   outline: none;
+}
+
+.gachasoku-button--apply {
+  min-width: 220px;
 }
 
 .gachasoku-button--outline {
@@ -1487,6 +1496,16 @@ footer p {
   flex-wrap: wrap;
   gap: 12px;
   align-items: center;
+}
+
+.gachasoku-campaign-card__status {
+  display: inline-flex;
+  align-items: center;
+  padding: 10px 18px;
+  border-radius: 999px;
+  background: rgba(59, 130, 246, 0.18);
+  color: #1d4ed8;
+  font-weight: 700;
 }
 
 .gachasoku-campaign-card__notice {
