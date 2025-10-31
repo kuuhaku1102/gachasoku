@@ -40,25 +40,6 @@ function gachasoku_apply_archive_filters($query) {
     return;
   }
 
-  $sort = isset($_GET['sort']) ? sanitize_key(wp_unslash($_GET['sort'])) : '';
-
-  switch ($sort) {
-    case 'oldest':
-      $query->set('orderby', 'date');
-      $query->set('order', 'ASC');
-      break;
-    case 'title':
-      $query->set('orderby', 'title');
-      $query->set('order', 'ASC');
-      break;
-    default:
-      if ($sort) {
-        $query->set('orderby', 'date');
-        $query->set('order', 'DESC');
-      }
-      break;
-  }
-
   $site = isset($_GET['site']) ? sanitize_text_field(wp_unslash($_GET['site'])) : '';
 
   if ($site !== '') {
