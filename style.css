@@ -271,3 +271,128 @@ footer p {
     width: 100%;
   }
 }
+
+/* Archive listing */
+.archive-section {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+.archive-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px;
+}
+
+.archive-card {
+  background: var(--white);
+  border-radius: 16px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  transition: var(--transition);
+}
+
+.archive-card:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.12);
+}
+
+.archive-card__thumbnail {
+  display: block;
+  overflow: hidden;
+}
+
+.archive-card__thumbnail img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+}
+
+.archive-card__body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 24px;
+  flex: 1 1 auto;
+}
+
+.archive-card__title {
+  font-size: 1.2rem;
+  margin: 0;
+}
+
+.archive-card__title a {
+  color: inherit;
+  text-decoration: none;
+  transition: var(--transition);
+}
+
+.archive-card__title a:hover {
+  color: var(--link-color);
+}
+
+.archive-card__excerpt {
+  margin: 0;
+  color: #555;
+}
+
+.archive-card__button {
+  margin-top: auto;
+  align-self: flex-start;
+}
+
+.pagination {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+}
+
+.pagination .page-numbers {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--white);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.08);
+  color: var(--dark-gray);
+  text-decoration: none;
+  font-weight: 600;
+  transition: var(--transition);
+}
+
+.pagination .page-numbers.current,
+.pagination .page-numbers:hover {
+  background: var(--main-yellow);
+  color: var(--dark-gray);
+}
+
+.archive-empty {
+  text-align: center;
+  color: #777;
+}
+
+@media (min-width: 1024px) {
+  .archive-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+@media (max-width: 599px) {
+  .archive-grid {
+    gap: 16px;
+  }
+
+  .archive-card__body {
+    padding: 20px;
+  }
+
+  .archive-card__title {
+    font-size: 1.1rem;
+  }
+}
