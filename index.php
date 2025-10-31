@@ -15,6 +15,14 @@ get_header();
     </div>
   </section>
 
+  <section id="ranking" class="ranking-highlight section">
+    <div class="container">
+      <h2>:trophy: 人気ランキングガチャ</h2>
+      <p>人気と評価の高いオンラインオリパをランキング形式でチェック！迷ったときの参考にどうぞ。</p>
+      <?php echo do_shortcode('[gachasoku_ranking]'); ?>
+    </div>
+  </section>
+
   <section id="latest" class="latest-oripa section">
     <div class="container">
       <h2>:dart: オリパ最新ガチャ情報</h2>
