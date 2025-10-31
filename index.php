@@ -31,16 +31,52 @@ get_header();
     </div>
   </section>
 
-  <section class="popular-sites section">
+  <section class="latest-posts section">
     <div class="container">
-      <h2>:trophy: 人気オンラインオリパサイト一覧</h2>
-      <ul class="site-list">
-        <li><a href="/oripaone/">オリパワン（OripaOne）</a> – 高還元率で人気！</li>
-        <li><a href="/oripadash/">オリパダッシュ（OripaDash）</a> – 高速更新＋即時在庫反映！</li>
-        <li><a href="/orikuji/">おりくじ</a> – コイン制ガチャの定番！</li>
-        <li><a href="/dopa/">DOPA-GAME</a> – イベント連動ガチャで注目！</li>
-      </ul>
-      <p>各サイトの特徴や評判を比較したい方は → <a href="/comparison/">オンラインオリパ比較表</a></p>
+      <h2>:newspaper: 最新記事一覧</h2>
+      <p>話題のオンラインオリパ情報や攻略記事をピックアップ。最新の投稿をチェックしよう！</p>
+      <?php
+      $gachasoku_latest_posts = new WP_Query([
+        'post_type'      => 'post',
+        'posts_per_page' => 4,
+        'post_status'    => 'publish',
+      ]);
+
+      if ($gachasoku_latest_posts->have_posts()) :
+        ?>
+        <div class="latest-posts__grid">
+          <?php
+          while ($gachasoku_latest_posts->have_posts()) :
+            $gachasoku_latest_posts->the_post();
+            $thumbnail_url = get_the_post_thumbnail_url(get_the_ID(), 'medium');
+            ?>
+            <article class="latest-posts__card">
+              <a class="latest-posts__thumb" href="<?php the_permalink(); ?>">
+                <?php if ($thumbnail_url) : ?>
+                  <img src="<?php echo esc_url($thumbnail_url); ?>" alt="<?php the_title_attribute(); ?>">
+                <?php else : ?>
+                  <span class="latest-posts__thumb--placeholder">No Image</span>
+                <?php endif; ?>
+              </a>
+              <div class="latest-posts__body">
+                <time class="latest-posts__date" datetime="<?php echo esc_attr(get_the_date('c')); ?>"><?php echo esc_html(get_the_date()); ?></time>
+                <h3 class="latest-posts__title"><a href="<?php the_permalink(); ?>"><?php the_title(); ?></a></h3>
+                <p class="latest-posts__excerpt"><?php echo esc_html(wp_trim_words(get_the_excerpt(), 22, '…')); ?></p>
+                <a class="latest-posts__more" href="<?php the_permalink(); ?>">記事を読む</a>
+              </div>
+            </article>
+            <?php
+          endwhile;
+          wp_reset_postdata();
+          ?>
+        </div>
+        <?php
+      else :
+        ?>
+        <p class="latest-posts__empty">現在表示できる記事がありません。</p>
+        <?php
+      endif;
+      ?>
     </div>
   </section>
 
