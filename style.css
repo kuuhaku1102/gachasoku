@@ -1234,6 +1234,42 @@ footer p {
   text-align: center;
 }
 
+.gachasoku-membership-links {
+  margin-top: 16px;
+  display: grid;
+  gap: 10px;
+  justify-items: center;
+}
+
+.gachasoku-membership-links__item {
+  color: #b7791f;
+  font-weight: 600;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: color 0.2s ease, transform 0.2s ease;
+}
+
+.gachasoku-membership-links__item::after {
+  content: '\2192';
+  font-size: 0.85em;
+  transform: translateX(0);
+  transition: transform 0.2s ease;
+}
+
+.gachasoku-membership-links__item:hover,
+.gachasoku-membership-links__item:focus {
+  color: #92400e;
+  transform: translateY(-1px);
+  outline: none;
+}
+
+.gachasoku-membership-links__item:hover::after,
+.gachasoku-membership-links__item:focus::after {
+  transform: translateX(4px);
+}
+
 .gachasoku-form {
   background: #fff;
   padding: 28px;

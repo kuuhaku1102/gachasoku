@@ -17,6 +17,10 @@ if (!defined('GACHASOKU_MEMBERSHIP_DB_VERSION')) {
   define('GACHASOKU_MEMBERSHIP_DB_VERSION', '1.0.0');
 }
 
+if (!defined('GACHASOKU_MEMBERSHIP_PAGES_VERSION')) {
+  define('GACHASOKU_MEMBERSHIP_PAGES_VERSION', '1.0.0');
+}
+
 function gachasoku_get_member_status_options() {
   return [
     GACHASOKU_MEMBER_STATUS_ACTIVE   => '有効',
@@ -28,8 +32,206 @@ function gachasoku_get_member_status_options() {
 function gachasoku_activate_membership_features() {
   gachasoku_register_member_role();
   gachasoku_install_membership_tables();
+  gachasoku_create_membership_pages();
 }
 add_action('after_switch_theme', 'gachasoku_activate_membership_features');
+
+add_action('init', 'gachasoku_maybe_create_membership_pages');
+function gachasoku_maybe_create_membership_pages() {
+  $definitions = gachasoku_get_membership_page_definitions();
+  $stored = get_option('gachasoku_membership_pages', []);
+  $needs_refresh = get_option('gachasoku_membership_pages_version') !== GACHASOKU_MEMBERSHIP_PAGES_VERSION;
+
+  if (!$needs_refresh) {
+    foreach ($definitions as $slug => $data) {
+      $page_id = isset($stored[$slug]) ? intval($stored[$slug]) : 0;
+      if ($page_id <= 0 || get_post_status($page_id) === false || get_post_status($page_id) === 'trash') {
+        $needs_refresh = true;
+        break;
+      }
+    }
+  }
+
+  if ($needs_refresh) {
+    gachasoku_create_membership_pages();
+  }
+}
+
+function gachasoku_get_membership_page_definitions() {
+  return [
+    'member-register' => [
+      'title' => '会員登録',
+      'content' => "[gachasoku_register_form]\n\n[gachasoku_membership_links context=\"register\"]",
+    ],
+    'member-login' => [
+      'title' => 'ログイン',
+      'content' => "[gachasoku_login_form]\n\n[gachasoku_membership_links context=\"login\"]",
+    ],
+    'member-password-reset' => [
+      'title' => 'パスワード再設定',
+      'content' => "[gachasoku_password_reset_form]\n\n[gachasoku_membership_links context=\"password\"]",
+    ],
+    'member-dashboard' => [
+      'title' => 'マイページ',
+      'content' => '[gachasoku_member_dashboard]',
+    ],
+    'campaigns' => [
+      'title' => 'キャンペーン一覧',
+      'content' => '[gachasoku_campaigns status="open"]',
+    ],
+  ];
+}
+
+function gachasoku_create_membership_pages() {
+  $definitions = gachasoku_get_membership_page_definitions();
+  $stored = get_option('gachasoku_membership_pages', []);
+  $updated = false;
+
+  foreach ($definitions as $slug => $data) {
+    $page_id = isset($stored[$slug]) ? intval($stored[$slug]) : 0;
+    if ($page_id > 0) {
+      $page = get_post($page_id);
+      if ($page && $page->post_status !== 'trash') {
+        continue;
+      }
+    }
+
+    $existing = get_page_by_path($slug, OBJECT, 'page');
+    if ($existing && $existing->post_status !== 'trash') {
+      $stored[$slug] = $existing->ID;
+      $updated = true;
+      continue;
+    }
+
+    $page_id = wp_insert_post([
+      'post_title' => wp_strip_all_tags($data['title']),
+      'post_name' => sanitize_title($slug),
+      'post_type' => 'page',
+      'post_status' => 'publish',
+      'post_content' => wp_slash($data['content']),
+      'comment_status' => 'closed',
+      'ping_status' => 'closed',
+    ]);
+
+    if (!is_wp_error($page_id)) {
+      $stored[$slug] = $page_id;
+      $updated = true;
+    }
+  }
+
+  if ($updated) {
+    update_option('gachasoku_membership_pages', $stored);
+  }
+
+  update_option('gachasoku_membership_pages_version', GACHASOKU_MEMBERSHIP_PAGES_VERSION);
+}
+
+function gachasoku_get_membership_page_url($slug) {
+  $stored = get_option('gachasoku_membership_pages', []);
+  if (isset($stored[$slug])) {
+    $permalink = get_permalink($stored[$slug]);
+    if ($permalink) {
+      return $permalink;
+    }
+  }
+
+  $page = get_page_by_path($slug, OBJECT, 'page');
+  if ($page) {
+    return get_permalink($page->ID);
+  }
+
+  return home_url('/' . $slug . '/');
+}
+
+function gachasoku_get_membership_link_items($context = 'default') {
+  $links = [];
+
+  switch ($context) {
+    case 'register':
+      $links[] = [
+        'label' => 'ログインはこちら',
+        'url' => gachasoku_get_membership_page_url('member-login'),
+      ];
+      $links[] = [
+        'label' => 'パスワードをお忘れの方',
+        'url' => gachasoku_get_membership_page_url('member-password-reset'),
+      ];
+      break;
+
+    case 'login':
+      $links[] = [
+        'label' => '会員登録はこちら',
+        'url' => gachasoku_get_membership_page_url('member-register'),
+      ];
+      $links[] = [
+        'label' => 'パスワードをお忘れの方',
+        'url' => gachasoku_get_membership_page_url('member-password-reset'),
+      ];
+      break;
+
+    case 'password':
+      $links[] = [
+        'label' => 'ログイン画面へ戻る',
+        'url' => gachasoku_get_membership_page_url('member-login'),
+      ];
+      $links[] = [
+        'label' => '新規会員登録',
+        'url' => gachasoku_get_membership_page_url('member-register'),
+      ];
+      break;
+
+    case 'dashboard':
+      $links[] = [
+        'label' => '公開中のキャンペーンを見る',
+        'url' => gachasoku_get_membership_page_url('campaigns'),
+      ];
+      break;
+
+    default:
+      $links[] = [
+        'label' => '会員登録',
+        'url' => gachasoku_get_membership_page_url('member-register'),
+      ];
+      $links[] = [
+        'label' => 'ログイン',
+        'url' => gachasoku_get_membership_page_url('member-login'),
+      ];
+      break;
+  }
+
+  return apply_filters('gachasoku_membership_link_items', $links, $context);
+}
+
+function gachasoku_render_membership_links($context = 'default') {
+  $links = array_filter(gachasoku_get_membership_link_items($context), function ($link) {
+    return !empty($link['url']) && !empty($link['label']);
+  });
+
+  if (empty($links)) {
+    return '';
+  }
+
+  ob_start();
+  echo '<div class="gachasoku-membership-links">';
+  foreach ($links as $link) {
+    printf(
+      '<a class="gachasoku-membership-links__item" href="%1$s">%2$s</a>',
+      esc_url($link['url']),
+      esc_html($link['label'])
+    );
+  }
+  echo '</div>';
+  return ob_get_clean();
+}
+
+add_shortcode('gachasoku_membership_links', 'gachasoku_membership_links_shortcode');
+function gachasoku_membership_links_shortcode($atts = []) {
+  $atts = shortcode_atts([
+    'context' => 'default',
+  ], $atts, 'gachasoku_membership_links');
+
+  return gachasoku_render_membership_links($atts['context']);
+}
 
 function gachasoku_register_member_role() {
   add_role(
@@ -844,6 +1046,7 @@ function gachasoku_register_form_shortcode() {
     </div>
     <input type="hidden" name="gachasoku_register_submit" value="1" />
   </form>
+  <?php echo gachasoku_render_membership_links('register'); ?>
   <?php
   return ob_get_clean();
 }
@@ -878,6 +1081,7 @@ function gachasoku_login_form_shortcode() {
     </div>
     <input type="hidden" name="gachasoku_login_submit" value="1" />
   </form>
+  <?php echo gachasoku_render_membership_links('login'); ?>
   <?php
   return ob_get_clean();
 }
@@ -898,6 +1102,7 @@ function gachasoku_password_reset_form_shortcode() {
     </div>
     <input type="hidden" name="gachasoku_password_reset_submit" value="1" />
   </form>
+  <?php echo gachasoku_render_membership_links('password'); ?>
   <?php
   return ob_get_clean();
 }
@@ -961,6 +1166,7 @@ function gachasoku_member_dashboard_shortcode() {
       <?php echo gachasoku_render_dashboard_campaign_list($grouped['result'], '当選結果はまだありません。', true); ?>
     </section>
   </div>
+  <?php echo gachasoku_render_membership_links('dashboard'); ?>
   <?php
   return ob_get_clean();
 }
