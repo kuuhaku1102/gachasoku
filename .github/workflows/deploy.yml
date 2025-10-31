@@ -19,8 +19,8 @@ jobs:
           mkdir -p ~/.ssh
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
-          ssh-keyscan -H www1012.conoha.ne.jp >> ~/.ssh/known_hosts
+          ssh-keyscan -p 8022 -H www1012.conoha.ne.jp >> ~/.ssh/known_hosts
 
       - name: Test SSH connection
         run: |
-          ssh -i ~/.ssh/id_ed25519 -p 22 "kuuhaku@online-gacha-hack.com"@www1012.conoha.ne.jp "echo '✅ SSH connection successful!'"
+          ssh -i ~/.ssh/id_ed25519 -p 8022 c3659606@www1012.conoha.ne.jp "echo '✅ SSH connection successful from GitHub Actions!'"
