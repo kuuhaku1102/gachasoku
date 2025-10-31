@@ -62,11 +62,14 @@ function gachasoku_render_ranking_list($entries = null, $args = []) {
       $position = isset($entry['position']) ? $entry['position'] : '';
       $image_url = isset($entry['image_url']) ? $entry['image_url'] : '';
       $image_link = isset($entry['image_link']) ? $entry['image_link'] : '';
+      $image_link = gachasoku_apply_affiliate_url($image_link);
       $content = isset($entry['content']) ? $entry['content'] : '';
       $detail_label = isset($entry['detail_label']) ? $entry['detail_label'] : '';
       $detail_url = isset($entry['detail_url']) ? $entry['detail_url'] : '';
+      $detail_url = gachasoku_apply_affiliate_url($detail_url);
       $official_label = isset($entry['official_label']) ? $entry['official_label'] : '';
       $official_url = isset($entry['official_url']) ? $entry['official_url'] : '';
+      $official_url = gachasoku_apply_affiliate_url($official_url);
       ?>
       <li class="<?php echo esc_attr($args['item_class']); ?>">
         <div class="ranking-card">
@@ -316,6 +319,229 @@ function gachasoku_ranking_shortcode($atts, $content = '') {
   return '<div class="ranking-page ranking-shortcode"><div class="ranking-container">' . $header_html . $list_html . '</div></div>';
 }
 add_shortcode('gachasoku_ranking', 'gachasoku_ranking_shortcode');
+
+function gachasoku_get_affiliate_mappings() {
+  $mappings = get_option('gachasoku_affiliate_mappings', []);
+  if (!is_array($mappings)) {
+    $mappings = [];
+  }
+
+  return $mappings;
+}
+
+function gachasoku_sanitize_affiliate_domain($value) {
+  $value = trim($value);
+  if ($value === '') {
+    return '';
+  }
+
+  if (!preg_match('#^[a-z][a-z0-9+.-]*://#i', $value)) {
+    $value = 'https://' . $value;
+  }
+
+  $parts = wp_parse_url($value);
+  if ($parts && isset($parts['host'])) {
+    $domain = strtolower($parts['host']);
+  } else {
+    $domain = strtolower(trim($value, '/'));
+  }
+
+  return $domain;
+}
+
+function gachasoku_save_affiliate_mappings($raw_entries) {
+  $mappings = [];
+
+  if (!is_array($raw_entries)) {
+    $raw_entries = [];
+  }
+
+  foreach ($raw_entries as $entry) {
+    $domain = isset($entry['domain']) ? gachasoku_sanitize_affiliate_domain($entry['domain']) : '';
+    $url = isset($entry['url']) ? esc_url_raw($entry['url']) : '';
+
+    if ($domain === '' || $url === '') {
+      continue;
+    }
+
+    $mappings[] = [
+      'domain' => $domain,
+      'url' => $url,
+    ];
+  }
+
+  update_option('gachasoku_affiliate_mappings', $mappings);
+  return $mappings;
+}
+
+function gachasoku_apply_affiliate_url($url, $mappings = null) {
+  $url = trim($url);
+  if ($url === '') {
+    return $url;
+  }
+
+  if ($mappings === null) {
+    $mappings = gachasoku_get_affiliate_mappings();
+  }
+
+  if (empty($mappings)) {
+    return $url;
+  }
+
+  $parts = wp_parse_url($url);
+  if (!$parts || empty($parts['host'])) {
+    return $url;
+  }
+
+  $host = strtolower($parts['host']);
+
+  foreach ($mappings as $mapping) {
+    if (empty($mapping['domain']) || empty($mapping['url'])) {
+      continue;
+    }
+
+    $domain = strtolower($mapping['domain']);
+    $pattern = '/(^|\.)' . preg_quote($domain, '/') . '$/';
+
+    if (preg_match($pattern, $host)) {
+      return $mapping['url'];
+    }
+  }
+
+  return $url;
+}
+
+function gachasoku_filter_affiliate_links($content) {
+  if (empty($content)) {
+    return $content;
+  }
+
+  $mappings = gachasoku_get_affiliate_mappings();
+  if (empty($mappings)) {
+    return $content;
+  }
+
+  return preg_replace_callback(
+    '/(<a\b[^>]*\bhref=["\'])([^"\']+)(["\'][^>]*>)/i',
+    function($matches) use ($mappings) {
+      $original = $matches[2];
+      $rewritten = gachasoku_apply_affiliate_url($original, $mappings);
+      if ($rewritten === $original) {
+        return $matches[1] . $original . $matches[3];
+      }
+      return $matches[1] . esc_url($rewritten) . $matches[3];
+    },
+    $content
+  );
+}
+
+add_filter('the_content', 'gachasoku_filter_affiliate_links', 20);
+add_filter('the_excerpt', 'gachasoku_filter_affiliate_links', 20);
+add_filter('widget_text', 'gachasoku_filter_affiliate_links', 20);
+add_filter('widget_text_content', 'gachasoku_filter_affiliate_links', 20);
+add_filter('term_description', 'gachasoku_filter_affiliate_links', 20);
+
+function gachasoku_register_link_manager_page() {
+  add_menu_page(
+    'リンク置換管理',
+    'リンク置換管理',
+    'manage_options',
+    'gachasoku-link-manager',
+    'gachasoku_render_link_manager_page',
+    'dashicons-admin-links',
+    21
+  );
+}
+add_action('admin_menu', 'gachasoku_register_link_manager_page');
+
+function gachasoku_enqueue_link_admin_assets($hook) {
+  if ($hook !== 'toplevel_page_gachasoku-link-manager') {
+    return;
+  }
+
+  wp_enqueue_script(
+    'gachasoku-link-admin',
+    get_template_directory_uri() . '/js/link-admin.js',
+    ['jquery'],
+    wp_get_theme()->get('Version'),
+    true
+  );
+  wp_enqueue_style(
+    'gachasoku-link-admin',
+    get_template_directory_uri() . '/css/link-admin.css',
+    [],
+    wp_get_theme()->get('Version')
+  );
+}
+add_action('admin_enqueue_scripts', 'gachasoku_enqueue_link_admin_assets');
+
+function gachasoku_render_link_manager_page() {
+  if (!current_user_can('manage_options')) {
+    return;
+  }
+
+  $mappings = gachasoku_get_affiliate_mappings();
+
+  if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    check_admin_referer('gachasoku_links_save', 'gachasoku_links_nonce');
+
+    $raw_entries = isset($_POST['gachasoku_affiliate_mappings']) && is_array($_POST['gachasoku_affiliate_mappings'])
+      ? $_POST['gachasoku_affiliate_mappings']
+      : [];
+    $mappings = gachasoku_save_affiliate_mappings($raw_entries);
+
+    add_settings_error('gachasoku_links', 'gachasoku_links_updated', 'リンク設定を更新しました。', 'updated');
+  }
+
+  settings_errors('gachasoku_links');
+  ?>
+  <div class="wrap">
+    <h1>リンク置換管理</h1>
+    <form method="post" class="gachasoku-link-admin">
+      <?php wp_nonce_field('gachasoku_links_save', 'gachasoku_links_nonce'); ?>
+      <p>ここで指定したルートドメインと置換先URLに基づき、サイト内のリンクを自動でアフィリエイトリンクへ差し替えます。</p>
+      <div id="gachasoku-link-entries" class="gachasoku-link-entries">
+        <?php if (!empty($mappings)) : ?>
+          <?php foreach ($mappings as $index => $mapping) : ?>
+            <?php gachasoku_render_link_entry_fields($index, $mapping); ?>
+          <?php endforeach; ?>
+        <?php endif; ?>
+      </div>
+      <button type="button" class="button" id="gachasoku-add-link">設定を追加</button>
+      <p class="submit">
+        <button type="submit" class="button button-primary">リンク設定を保存</button>
+      </p>
+    </form>
+    <script type="text/template" id="gachasoku-link-entry-template">
+      <?php gachasoku_render_link_entry_fields('__INDEX__', []); ?>
+    </script>
+  </div>
+  <?php
+}
+
+function gachasoku_render_link_entry_fields($index, $entry) {
+  $domain = isset($entry['domain']) ? $entry['domain'] : '';
+  $url = isset($entry['url']) ? $entry['url'] : '';
+  ?>
+  <div class="gachasoku-link-entry" data-index="<?php echo esc_attr($index); ?>">
+    <h2>設定 <span class="gachasoku-link-entry__number"></span></h2>
+    <div class="gachasoku-link-fields">
+      <label>
+        置換対象ルートドメイン
+        <input type="text" name="gachasoku_affiliate_mappings[<?php echo esc_attr($index); ?>][domain]" value="<?php echo esc_attr($domain); ?>" placeholder="例: oripa.ex-toreca.com" />
+      </label>
+      <label>
+        置換後URL
+        <input type="url" name="gachasoku_affiliate_mappings[<?php echo esc_attr($index); ?>][url]" value="<?php echo esc_attr($url); ?>" placeholder="https://example.com/?id=123" />
+      </label>
+    </div>
+    <p class="description">上記ドメインを含むリンクは、表示時にすべて置換後URLへリダイレクトされます。</p>
+    <button type="button" class="button-link-delete gachasoku-link-remove">この設定を削除</button>
+    <hr />
+  </div>
+  <?php
+}
+
 
 function gachasoku_get_calendar_events() {
   $events = get_option('gachasoku_calendar_events', []);
@@ -634,6 +860,11 @@ function gachasoku_get_calendar_month_events($year, $month) {
       continue;
     }
 
+    $normalized_event = $event;
+    if (isset($normalized_event['url']) && $normalized_event['url'] !== '') {
+      $normalized_event['url'] = gachasoku_apply_affiliate_url($normalized_event['url']);
+    }
+
     if ($type === 'monthly') {
       $day = isset($event['month_day']) ? intval($event['month_day']) : 0;
       if ($day < 1) {
@@ -642,7 +873,7 @@ function gachasoku_get_calendar_month_events($year, $month) {
       if ($day > $days_in_month) {
         $day = $days_in_month;
       }
-      $calendar[$day][] = $event;
+      $calendar[$day][] = $normalized_event;
       continue;
     }
 
@@ -655,7 +886,7 @@ function gachasoku_get_calendar_month_events($year, $month) {
       foreach (range(1, $days_in_month) as $day) {
         $current = new DateTime("$year-$month-$day");
         if (intval($current->format('w')) === $weekday) {
-          $calendar[$day][] = $event;
+          $calendar[$day][] = $normalized_event;
         }
       }
       continue;
@@ -689,7 +920,7 @@ function gachasoku_get_calendar_month_events($year, $month) {
     $current = clone $period_start;
     while ($current <= $period_end) {
       $day = intval($current->format('j'));
-      $calendar[$day][] = $event;
+      $calendar[$day][] = $normalized_event;
       $current->modify('+1 day');
     }
   }
@@ -806,6 +1037,7 @@ function gachasoku_render_calendar($year, $month) {
                       $color = gachasoku_get_calendar_event_color($event, $index);
                       $title = isset($event['title']) ? $event['title'] : '';
                       $url = isset($event['url']) ? $event['url'] : '';
+                      $url = gachasoku_apply_affiliate_url($url);
                       $time_text = isset($event['time_text']) ? $event['time_text'] : '';
                       $notes = isset($event['notes']) ? $event['notes'] : '';
                       ?>
@@ -838,6 +1070,7 @@ function gachasoku_render_calendar($year, $month) {
       $pickup = $pickup_events[0];
       $pickup_title = isset($pickup['title']) ? $pickup['title'] : '';
       $pickup_url = isset($pickup['url']) ? $pickup['url'] : '';
+      $pickup_url = gachasoku_apply_affiliate_url($pickup_url);
       ?>
       <div class="gachasoku-calendar__pickup">
         <p class="gachasoku-calendar__pickup-label">本日のピックアップイベント</p>
