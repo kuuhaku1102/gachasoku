@@ -1237,3 +1237,5 @@ function gachasoku_get_upcoming_calendar_events($limit = 10) {
 
   return $items;
 }
+
+require_once get_template_directory() . '/inc/membership.php';

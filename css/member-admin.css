@@ -1,0 +1,84 @@
+.gachasoku-member-admin__filters,
+.gachasoku-draw-admin__filters {
+  margin-bottom: 20px;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.gachasoku-member-admin__filters input[type="search"],
+.gachasoku-draw-admin__filters input[type="search"] {
+  padding: 6px 10px;
+  min-width: 240px;
+}
+
+.gachasoku-member-admin__inline-form {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.gachasoku-member-admin__inline-form select {
+  min-width: 120px;
+}
+
+.gachasoku-draw-admin__list {
+  display: grid;
+  gap: 28px;
+}
+
+.gachasoku-draw-admin__item {
+  border: 1px solid #d1d5db;
+  border-radius: 12px;
+  padding: 18px 22px;
+  background: #fff;
+  box-shadow: 0 12px 28px rgba(0,0,0,0.05);
+}
+
+.gachasoku-draw-admin__header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: baseline;
+  margin-bottom: 14px;
+}
+
+.gachasoku-draw-admin__form-grid {
+  display: flex;
+  gap: 18px;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.gachasoku-draw-admin__form-grid input[type="number"] {
+  width: 120px;
+}
+
+.gachasoku-draw-admin__checkbox {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  font-weight: 600;
+}
+
+.gachasoku-draw-admin__logs ul {
+  margin: 12px 0 0;
+  padding-left: 20px;
+}
+
+.gachasoku-draw-admin__logs li {
+  margin-bottom: 6px;
+}
+
+@media (max-width: 782px) {
+  .gachasoku-member-admin__filters,
+  .gachasoku-draw-admin__filters {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .gachasoku-draw-admin__form-grid {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

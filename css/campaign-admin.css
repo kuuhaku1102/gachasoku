@@ -1,0 +1,44 @@
+.gachasoku-campaign-meta .gachasoku-campaign-image {
+  display: flex;
+  align-items: flex-start;
+  gap: 18px;
+}
+
+.gachasoku-campaign-image__preview {
+  width: 180px;
+  height: 180px;
+  border-radius: 12px;
+  background: #f8fafc;
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.gachasoku-campaign-image__preview img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
+
+.gachasoku-campaign-image__placeholder {
+  color: #94a3b8;
+  font-weight: 600;
+}
+
+.gachasoku-campaign-image__actions {
+  display: grid;
+  gap: 8px;
+}
+
+.gachasoku-campaign-meta input[type="datetime-local"],
+.gachasoku-campaign-meta input[type="number"],
+.gachasoku-campaign-meta input[type="url"],
+.gachasoku-campaign-meta textarea {
+  width: 100%;
+}
+
+.gachasoku-campaign-meta textarea {
+  min-height: 120px;
+}
