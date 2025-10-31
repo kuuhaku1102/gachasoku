@@ -7,6 +7,13 @@ add_action('after_setup_theme', function() {
 
 add_action('wp_enqueue_scripts', function() {
   wp_enqueue_style('yellowsmile-style', get_stylesheet_uri());
+  wp_enqueue_script(
+    'gachasoku-theme',
+    get_template_directory_uri() . '/js/theme.js',
+    [],
+    '1.0.0',
+    true
+  );
 });
 
 function gachasoku_get_archive_site_terms() {
