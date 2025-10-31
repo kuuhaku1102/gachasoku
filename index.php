@@ -31,16 +31,53 @@ get_header();
     </div>
   </section>
 
-  <section class="popular-sites section">
+  <section class="latest-articles section">
     <div class="container">
-      <h2>:trophy: 人気オンラインオリパサイト一覧</h2>
-      <ul class="site-list">
-        <li><a href="/oripaone/">オリパワン（OripaOne）</a> – 高還元率で人気！</li>
-        <li><a href="/oripadash/">オリパダッシュ（OripaDash）</a> – 高速更新＋即時在庫反映！</li>
-        <li><a href="/orikuji/">おりくじ</a> – コイン制ガチャの定番！</li>
-        <li><a href="/dopa/">DOPA-GAME</a> – イベント連動ガチャで注目！</li>
-      </ul>
-      <p>各サイトの特徴や評判を比較したい方は → <a href="/comparison/">オンラインオリパ比較表</a></p>
+      <h2>:newspaper: 最新記事一覧</h2>
+      <p>話題のオンラインオリパ情報や攻略記事をピックアップ。最新トピックをサクッとチェックしよう！</p>
+      <?php
+      $gachasoku_latest_articles = new WP_Query([
+        'post_type'      => 'post',
+        'posts_per_page' => 4,
+        'post_status'    => 'publish',
+      ]);
+
+      if ($gachasoku_latest_articles->have_posts()) :
+        echo '<div class="articles-grid">';
+        while ($gachasoku_latest_articles->have_posts()) :
+          $gachasoku_latest_articles->the_post();
+          $permalink = get_permalink();
+          $title     = get_the_title();
+          $date      = get_the_date();
+          $excerpt   = wp_strip_all_tags(get_the_excerpt());
+      ?>
+          <article class="article-card">
+            <a href="<?php echo esc_url($permalink); ?>">
+              <div class="article-thumb">
+                <?php if (has_post_thumbnail()) : ?>
+                  <?php the_post_thumbnail('medium_large'); ?>
+                <?php else : ?>
+                  <div class="article-thumb__placeholder" aria-hidden="true">
+                    <span>NO IMAGE</span>
+                  </div>
+                <?php endif; ?>
+              </div>
+              <div class="article-content">
+                <span class="article-date"><?php echo esc_html($date); ?></span>
+                <h3><?php echo esc_html($title); ?></h3>
+                <p><?php echo esc_html(wp_trim_words($excerpt, 24, '…')); ?></p>
+                <span class="article-more">続きを読む</span>
+              </div>
+            </a>
+          </article>
+      <?php
+        endwhile;
+        echo '</div>';
+        wp_reset_postdata();
+      else :
+      ?>
+        <p class="no-articles">まだ記事がありません。公開までしばらくお待ちください。</p>
+      <?php endif; ?>
     </div>
   </section>
 
