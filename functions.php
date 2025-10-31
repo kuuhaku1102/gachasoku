@@ -9,6 +9,73 @@ add_action('wp_enqueue_scripts', function() {
   wp_enqueue_style('yellowsmile-style', get_stylesheet_uri());
 });
 
+function gachasoku_get_archive_site_terms() {
+  $terms = get_terms([
+    'taxonomy'   => 'category',
+    'hide_empty' => true,
+    'orderby'    => 'name',
+    'order'      => 'ASC',
+  ]);
+
+  if (is_wp_error($terms)) {
+    return [];
+  }
+
+  return apply_filters('gachasoku_archive_site_terms', $terms);
+}
+
+function gachasoku_apply_archive_filters($query) {
+  if (is_admin() || !$query->is_main_query()) {
+    return;
+  }
+
+  if (!$query->is_home() && !$query->is_archive() && !$query->is_search()) {
+    return;
+  }
+
+  $sort = isset($_GET['sort']) ? sanitize_key(wp_unslash($_GET['sort'])) : '';
+
+  switch ($sort) {
+    case 'oldest':
+      $query->set('orderby', 'date');
+      $query->set('order', 'ASC');
+      break;
+    case 'title':
+      $query->set('orderby', 'title');
+      $query->set('order', 'ASC');
+      break;
+    default:
+      if ($sort) {
+        $query->set('orderby', 'date');
+        $query->set('order', 'DESC');
+      }
+      break;
+  }
+
+  $site = isset($_GET['site']) ? sanitize_text_field(wp_unslash($_GET['site'])) : '';
+
+  if ($site !== '') {
+    $term = get_term_by('slug', $site, 'category');
+
+    if ($term && !is_wp_error($term)) {
+      $tax_query = $query->get('tax_query');
+
+      if (!is_array($tax_query)) {
+        $tax_query = [];
+      }
+
+      $tax_query[] = [
+        'taxonomy' => 'category',
+        'field'    => 'term_id',
+        'terms'    => [$term->term_id],
+      ];
+
+      $query->set('tax_query', $tax_query);
+    }
+  }
+}
+add_action('pre_get_posts', 'gachasoku_apply_archive_filters');
+
 function gachasoku_get_ranking_entries() {
   $entries = get_option('gachasoku_ranking_entries', []);
   if (!is_array($entries)) {
