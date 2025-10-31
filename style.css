@@ -752,6 +752,18 @@ footer p {
   font-size: 1.02rem;
 }
 
+.oripa-index .ranking-highlight .container {
+  gap: 36px;
+}
+
+.oripa-index .ranking-highlight .ranking-page .ranking-container {
+  max-width: 100%;
+}
+
+.oripa-index .ranking-highlight .ranking-list {
+  gap: 28px;
+}
+
 .oripa-index .latest-oripa .container {
   gap: 36px;
 }
