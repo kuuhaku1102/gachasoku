@@ -1,13 +1,95 @@
-<?php get_header(); ?>
-<h2 class="section-title">テスト最新の記事</h2>
-<?php if (have_posts()) : while (have_posts()) : the_post(); ?>
-  <div class="card">
-    <h3><a href="<?php the_permalink(); ?>"><?php the_title(); ?></a></h3>
-    <p><?php the_excerpt(); ?></p>
-    <a href="<?php the_permalink(); ?>" class="button">続きを読む</a>
-  </div>
-<?php endwhile; else: ?>
-  <p>記事がありません。</p>
-<?php endif; ?>
-<?php get_footer(); ?>
+<?php
+/* Template Name: オンラインオリパまとめ - Index */
+get_header();
+?>
 
+<main class="oripa-index">
+  <section class="hero">
+    <div class="container">
+      <h1>【2025年最新版】オンラインオリパ・ガチャサイトまとめ</h1>
+      <p>
+        ポケカ・遊戯王・ワンピースなど人気トレカの最新オンラインオリパ情報を毎日更新！
+        当サイトでは信頼できるオリパ販売サイトを徹底比較し、初心者でも安心して楽しめるガチャを紹介しています。
+      </p>
+      <a href="#latest" class="btn-primary">最新ガチャを見る</a>
+    </div>
+  </section>
+
+  <section id="latest" class="latest-oripa section">
+    <div class="container">
+      <h2>:dart: オリパ最新ガチャ情報</h2>
+      <p>最新のオンラインオリパガチャ一覧を毎日更新！人気・限定イベント・高還元オリパを見逃すな！</p>
+      <?php echo do_shortcode('[oripa_list]'); ?>
+    </div>
+  </section>
+
+  <section id="calendar" class="calendar section">
+    <div class="container">
+      <h2>:date: オリパイベントカレンダー</h2>
+      <p>各サイトで開催されるキャンペーン・特別ガチャ・限定BOX情報をカレンダー形式でチェック！</p>
+      <?php echo do_shortcode('[gachasoku_calendar]'); ?>
+    </div>
+  </section>
+
+  <section class="popular-sites section">
+    <div class="container">
+      <h2>:trophy: 人気オンラインオリパサイト一覧</h2>
+      <ul class="site-list">
+        <li><a href="/oripaone/">オリパワン（OripaOne）</a> – 高還元率で人気！</li>
+        <li><a href="/oripadash/">オリパダッシュ（OripaDash）</a> – 高速更新＋即時在庫反映！</li>
+        <li><a href="/orikuji/">おりくじ</a> – コイン制ガチャの定番！</li>
+        <li><a href="/dopa/">DOPA-GAME</a> – イベント連動ガチャで注目！</li>
+      </ul>
+      <p>各サイトの特徴や評判を比較したい方は → <a href="/comparison/">オンラインオリパ比較表</a></p>
+    </div>
+  </section>
+
+  <section class="about section">
+    <div class="container">
+      <h2>:bulb: オンラインオリパとは？</h2>
+      <p>
+        「オンラインオリパ」は、実店舗で販売されていた「オリジナルパック」をネット上で楽しめるサービスです。
+        トレカファンが気軽にレアカードを狙える仕組みとして急速に普及しています。
+      </p>
+      <h3>:mag: オンラインオリパが人気の理由</h3>
+      <ul>
+        <li>抽選結果がすぐに分かるリアルタイム感</li>
+        <li>限定イベント・コラボなど多彩なガチャ企画</li>
+        <li>在庫・排出率が明確で安心</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="faq section">
+    <div class="container">
+      <h2>:woman-raising-hand: よくある質問（FAQ）</h2>
+      <dl>
+        <dt>Q. オンラインオリパは違法じゃないの？</dt>
+        <dd>各サイトは古物商許可を取得し、景品表示法に準拠して運営されています。</dd>
+        <dt>Q. 高額カードは本当に当たりますか？</dt>
+        <dd>在庫・当選履歴が公開されており、透明性が高いサイトを選ぶのがポイントです。</dd>
+        <dt>Q. 支払い方法は？</dt>
+        <dd>クレジットカード・PayPay・コンビニ払いなど各種対応。詳細は各公式サイトで確認。</dd>
+      </dl>
+    </div>
+  </section>
+
+  <section class="comparison section">
+    <div class="container">
+      <h2>:scales: オンラインオリパ比較表</h2>
+      <table class="comparison-table">
+        <thead>
+          <tr><th>サイト名</th><th>特徴</th><th>還元率</th><th>取扱シリーズ</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>オリパワン</td><td>初心者に人気</td><td>約85%</td><td>ポケカ・ワンピース</td></tr>
+          <tr><td>オリパダッシュ</td><td>更新頻度が高い</td><td>約90%</td><td>遊戯王・ポケカ</td></tr>
+          <tr><td>おりくじ</td><td>低価格帯中心</td><td>約80%</td><td>ポケカ・MTG</td></tr>
+          <tr><td>DOPA</td><td>イベント特化型</td><td>約88%</td><td>ポケカ</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+</main>
+
+<?php get_footer(); ?>
