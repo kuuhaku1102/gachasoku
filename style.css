@@ -756,13 +756,6 @@ footer p {
   gap: 36px;
 }
 
-/* Hide thumbnails that appear inside the latest gacha shortcode output */
-.oripa-index .latest-oripa img,
-.oripa-index .latest-oripa figure,
-.oripa-index .latest-oripa [class*="thumb"] {
-  display: none !important;
-}
-
 .oripa-index .popular-sites .site-list {
   list-style: none;
   margin: 0;
