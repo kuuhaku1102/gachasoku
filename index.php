@@ -17,7 +17,7 @@ get_header();
 
   <section id="ranking" class="ranking-highlight section">
     <div class="container">
-      <h2>:trophy: 人気ランキングガチャ</h2>
+      <h2>人気ランキングガチャ</h2>
       <p>人気と評価の高いオンラインオリパをランキング形式でチェック！迷ったときの参考にどうぞ。</p>
       <?php echo do_shortcode('[gachasoku_ranking]'); ?>
     </div>
@@ -25,7 +25,7 @@ get_header();
 
   <section id="latest" class="latest-oripa section">
     <div class="container">
-      <h2>:dart: オリパ最新ガチャ情報</h2>
+      <h2>オリパ最新ガチャ情報</h2>
       <p>最新のオンラインオリパガチャ一覧を毎日更新！人気・限定イベント・高還元オリパを見逃すな！</p>
       <?php echo do_shortcode('[oripa_list]'); ?>
     </div>
@@ -33,7 +33,7 @@ get_header();
 
   <section id="calendar" class="calendar section">
     <div class="container">
-      <h2>:date: オリパイベントカレンダー</h2>
+      <h2>オリパイベントカレンダー</h2>
       <p>各サイトで開催されるキャンペーン・特別ガチャ・限定BOX情報をカレンダー形式でチェック！</p>
       <?php echo do_shortcode('[gachasoku_calendar]'); ?>
     </div>
@@ -41,7 +41,7 @@ get_header();
 
   <section class="latest-posts section">
     <div class="container">
-      <h2>:newspaper: 最新記事一覧</h2>
+      <h2>最新記事一覧</h2>
       <p>話題のオンラインオリパ情報や攻略記事をピックアップ。最新の投稿をチェックしよう！</p>
       <?php
       $gachasoku_latest_posts = new WP_Query([
@@ -90,12 +90,12 @@ get_header();
 
   <section class="about section">
     <div class="container">
-      <h2>:bulb: オンラインオリパとは？</h2>
+      <h2>オンラインオリパとは？</h2>
       <p>
         「オンラインオリパ」は、実店舗で販売されていた「オリジナルパック」をネット上で楽しめるサービスです。
         トレカファンが気軽にレアカードを狙える仕組みとして急速に普及しています。
       </p>
-      <h3>:mag: オンラインオリパが人気の理由</h3>
+      <h3>オンラインオリパが人気の理由</h3>
       <ul>
         <li>抽選結果がすぐに分かるリアルタイム感</li>
         <li>限定イベント・コラボなど多彩なガチャ企画</li>
@@ -106,7 +106,7 @@ get_header();
 
   <section class="faq section">
     <div class="container">
-      <h2>:woman-raising-hand: よくある質問（FAQ）</h2>
+      <h2>よくある質問（FAQ）</h2>
       <dl>
         <dt>Q. オンラインオリパは違法じゃないの？</dt>
         <dd>各サイトは古物商許可を取得し、景品表示法に準拠して運営されています。</dd>
@@ -120,7 +120,7 @@ get_header();
 
   <section class="comparison section">
     <div class="container">
-      <h2>:scales: オンラインオリパ比較表</h2>
+      <h2>オンラインオリパ比較表</h2>
       <table class="comparison-table">
         <thead>
           <tr><th>サイト名</th><th>特徴</th><th>還元率</th><th>取扱シリーズ</th></tr>
