@@ -19,7 +19,6 @@
 
   <?php
     $selected_site = isset($_GET['site']) ? sanitize_text_field(wp_unslash($_GET['site'])) : '';
-    $selected_sort = isset($_GET['sort']) ? sanitize_key(wp_unslash($_GET['sort'])) : 'latest';
     $site_terms     = gachasoku_get_archive_site_terms();
   ?>
 
@@ -35,14 +34,6 @@
         <?php foreach ($site_terms as $term) : ?>
           <option value="<?php echo esc_attr($term->slug); ?>" <?php selected($selected_site, $term->slug); ?>><?php echo esc_html($term->name); ?></option>
         <?php endforeach; ?>
-      </select>
-    </div>
-    <div class="archive-filters__group archive-filters__group--sort">
-      <label for="archive-filter-sort">並び替え</label>
-      <select id="archive-filter-sort" name="sort" onchange="this.form.submit()">
-        <option value="latest" <?php selected($selected_sort, 'latest'); ?>>最新順</option>
-        <option value="oldest" <?php selected($selected_sort, 'oldest'); ?>>古い順</option>
-        <option value="title" <?php selected($selected_sort, 'title'); ?>>タイトル順</option>
       </select>
     </div>
     <noscript>

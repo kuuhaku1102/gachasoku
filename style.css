@@ -471,7 +471,6 @@ footer p {
   flex: 2 1 240px;
 }
 
-.archive-filters__group--sort select,
 .archive-filters__group--site select {
   cursor: pointer;
 }
