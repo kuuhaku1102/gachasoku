@@ -82,10 +82,30 @@ get_header();
           <tr><th>サイト名</th><th>特徴</th><th>還元率</th><th>取扱シリーズ</th></tr>
         </thead>
         <tbody>
-          <tr><td>オリパワン</td><td>初心者に人気</td><td>約85%</td><td>ポケカ・ワンピース</td></tr>
-          <tr><td>オリパダッシュ</td><td>更新頻度が高い</td><td>約90%</td><td>遊戯王・ポケカ</td></tr>
-          <tr><td>おりくじ</td><td>低価格帯中心</td><td>約80%</td><td>ポケカ・MTG</td></tr>
-          <tr><td>DOPA</td><td>イベント特化型</td><td>約88%</td><td>ポケカ</td></tr>
+          <tr>
+            <td data-label="サイト名">オリパワン</td>
+            <td data-label="特徴">初心者に人気</td>
+            <td data-label="還元率">約85%</td>
+            <td data-label="取扱シリーズ">ポケカ・ワンピース</td>
+          </tr>
+          <tr>
+            <td data-label="サイト名">オリパダッシュ</td>
+            <td data-label="特徴">更新頻度が高い</td>
+            <td data-label="還元率">約90%</td>
+            <td data-label="取扱シリーズ">遊戯王・ポケカ</td>
+          </tr>
+          <tr>
+            <td data-label="サイト名">おりくじ</td>
+            <td data-label="特徴">低価格帯中心</td>
+            <td data-label="還元率">約80%</td>
+            <td data-label="取扱シリーズ">ポケカ・MTG</td>
+          </tr>
+          <tr>
+            <td data-label="サイト名">DOPA</td>
+            <td data-label="特徴">イベント特化型</td>
+            <td data-label="還元率">約88%</td>
+            <td data-label="取扱シリーズ">ポケカ</td>
+          </tr>
         </tbody>
       </table>
     </div>
