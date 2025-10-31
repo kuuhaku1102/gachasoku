@@ -396,3 +396,155 @@ footer p {
     font-size: 1.1rem;
   }
 }
+
+.gachasoku-calendar {
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 24px;
+  background: #fff;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.05);
+}
+
+.gachasoku-calendar__header {
+  margin-bottom: 16px;
+  text-align: center;
+}
+
+.gachasoku-calendar__title {
+  font-size: 24px;
+  margin: 0;
+}
+
+.gachasoku-calendar__table {
+  display: grid;
+  gap: 8px;
+}
+
+.gachasoku-calendar__row {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.gachasoku-calendar__cell {
+  border: 1px solid #edf2f7;
+  border-radius: 10px;
+  min-height: 110px;
+  padding: 12px;
+  background: #f8fafc;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.gachasoku-calendar__cell--head {
+  min-height: auto;
+  background: transparent;
+  border: none;
+  font-weight: 600;
+  text-align: center;
+  padding: 0;
+  color: #475569;
+}
+
+.gachasoku-calendar__cell--empty {
+  background: transparent;
+  border: none;
+}
+
+.gachasoku-calendar__cell--has-events {
+  background: #fff;
+  border-color: #cbd5f5;
+}
+
+.gachasoku-calendar__day {
+  font-weight: 700;
+  font-size: 18px;
+  color: #1e293b;
+}
+
+.gachasoku-calendar__events {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.gachasoku-calendar__event {
+  background: var(--event-color, #cbd5f5);
+  color: #0f172a;
+  border-radius: 8px;
+  padding: 8px;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.gachasoku-calendar__event a {
+  color: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+}
+
+.gachasoku-calendar__event-name {
+  font-weight: 600;
+}
+
+.gachasoku-calendar__event-time {
+  font-size: 13px;
+}
+
+.gachasoku-calendar__event-notes p {
+  margin: 4px 0 0;
+  font-size: 13px;
+}
+
+.gachasoku-calendar__pickup {
+  margin-top: 24px;
+  text-align: center;
+  display: grid;
+  gap: 12px;
+}
+
+.gachasoku-calendar__pickup-label {
+  margin: 0;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.gachasoku-calendar__pickup-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 24px;
+  background: #2563eb;
+  color: #fff;
+  border-radius: 999px;
+  font-weight: 600;
+  transition: background 0.2s ease;
+}
+
+.gachasoku-calendar__pickup-button:hover,
+.gachasoku-calendar__pickup-button:focus {
+  background: #1d4ed8;
+  color: #fff;
+}
+
+.gachasoku-calendar__pickup-button--static {
+  background: #e2e8f0;
+  color: #1f2937;
+}
+
+@media (max-width: 768px) {
+  .gachasoku-calendar {
+    padding: 16px;
+  }
+
+  .gachasoku-calendar__row {
+    gap: 4px;
+  }
+
+  .gachasoku-calendar__cell {
+    padding: 10px;
+  }
+}
