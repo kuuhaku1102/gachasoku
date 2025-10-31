@@ -1294,6 +1294,154 @@ function gachasoku_get_campaign_card_data($campaign_id) {
   ];
 }
 
+function gachasoku_build_campaign_item($campaign_id, $member_id = 0) {
+  $card = gachasoku_get_campaign_card_data($campaign_id);
+  if (!$card) {
+    return null;
+  }
+
+  $has_applied = false;
+  if ($member_id) {
+    $has_applied = gachasoku_user_has_applied($campaign_id, $member_id);
+  }
+
+  return [
+    'campaign_id' => $campaign_id,
+    'card' => $card,
+    'has_applied' => $has_applied,
+    'nonce' => $member_id ? wp_create_nonce('gachasoku_apply_campaign_' . $campaign_id) : '',
+  ];
+}
+
+function gachasoku_render_campaign_cards($items, $args = []) {
+  $defaults = [
+    'container' => true,
+    'container_class' => 'gachasoku-campaigns',
+    'empty_message' => '',
+    'empty_class' => 'gachasoku-campaigns__empty',
+    'apply_label' => '応募して公式サイトを開く',
+    'applied_label' => '応募済み',
+    'visit_label' => '公式サイトへ',
+  ];
+  $args = wp_parse_args($args, $defaults);
+
+  if (empty($items)) {
+    if ($args['empty_message'] === '') {
+      return '';
+    }
+    return '<p class="' . esc_attr($args['empty_class']) . '">' . esc_html($args['empty_message']) . '</p>';
+  }
+
+  ob_start();
+  if ($args['container']) {
+    echo '<div class="' . esc_attr($args['container_class']) . '">';
+  }
+
+  foreach ($items as $item) {
+    if (!isset($item['card'], $item['campaign_id'])) {
+      continue;
+    }
+
+    $card = $item['card'];
+    $campaign_id = intval($item['campaign_id']);
+    $has_applied = !empty($item['has_applied']);
+    $nonce = isset($item['nonce']) ? $item['nonce'] : '';
+    ?>
+    <article class="gachasoku-campaign-card">
+      <?php if (!empty($card['image'])) : ?>
+        <div class="gachasoku-campaign-card__image">
+          <?php if (!empty($card['link'])) : ?>
+            <a href="<?php echo esc_url($card['link']); ?>" target="_blank" rel="noopener noreferrer">
+              <img src="<?php echo esc_url($card['image']); ?>" alt="" />
+            </a>
+          <?php else : ?>
+            <img src="<?php echo esc_url($card['image']); ?>" alt="" />
+          <?php endif; ?>
+        </div>
+      <?php endif; ?>
+      <div class="gachasoku-campaign-card__body">
+        <h3 class="gachasoku-campaign-card__title"><?php echo esc_html($card['title']); ?></h3>
+        <div class="gachasoku-campaign-card__dates">
+          <?php if (!empty($card['start'])) : ?>
+            <span>開始：<?php echo esc_html(gachasoku_format_datetime($card['start'])); ?></span>
+          <?php endif; ?>
+          <?php if (!empty($card['end'])) : ?>
+            <span>終了：<?php echo esc_html(gachasoku_format_datetime($card['end'])); ?></span>
+          <?php endif; ?>
+          <?php if (!empty($card['max_winners'])) : ?>
+            <span>当選人数：<?php echo esc_html(number_format_i18n($card['max_winners'])); ?>名</span>
+          <?php endif; ?>
+        </div>
+        <?php if (!empty($card['requirements'])) : ?>
+          <div class="gachasoku-campaign-card__requirements">
+            <h4>応募条件</h4>
+            <?php echo wpautop(wp_kses_post($card['requirements'])); ?>
+          </div>
+        <?php endif; ?>
+        <?php if (!empty($card['content'])) : ?>
+          <div class="gachasoku-campaign-card__content">
+            <?php echo $card['content']; ?>
+          </div>
+        <?php endif; ?>
+        <div class="gachasoku-campaign-card__actions">
+          <?php
+          echo gachasoku_render_campaign_action(
+            $campaign_id,
+            $card,
+            $has_applied,
+            [
+              'nonce' => $nonce,
+              'apply_label' => $args['apply_label'],
+              'applied_label' => $args['applied_label'],
+              'visit_label' => $args['visit_label'],
+            ]
+          );
+          ?>
+        </div>
+      </div>
+    </article>
+    <?php
+  }
+
+  if ($args['container']) {
+    echo '</div>';
+  }
+
+  return ob_get_clean();
+}
+
+function gachasoku_get_open_campaign_items($member_id) {
+  $query = new WP_Query([
+    'post_type' => 'gachasoku_campaign',
+    'post_status' => 'publish',
+    'posts_per_page' => -1,
+    'orderby' => 'date',
+    'order' => 'DESC',
+  ]);
+
+  $items = [];
+
+  if ($query->have_posts()) {
+    while ($query->have_posts()) {
+      $query->the_post();
+      $campaign_id = get_the_ID();
+      $card = gachasoku_get_campaign_card_data($campaign_id);
+      if (!$card || !$card['is_open']) {
+        continue;
+      }
+
+      $item = gachasoku_build_campaign_item($campaign_id, $member_id);
+      if ($item) {
+        $items[] = $item;
+      }
+    }
+  }
+
+  wp_reset_postdata();
+
+  return $items;
+}
+
 function gachasoku_get_campaign_entries_for_user($user_id) {
   global $wpdb;
 
@@ -1539,6 +1687,7 @@ function gachasoku_member_dashboard_shortcode() {
   $status_options = gachasoku_get_member_status_options();
   $status_label = isset($status_options[$status]) ? $status_options[$status] : $status;
   $grouped = gachasoku_get_campaign_entries_grouped($member['id']);
+  $open_campaigns = gachasoku_get_open_campaign_items($member['id']);
 
   ob_start();
   echo gachasoku_render_membership_messages('dashboard');
@@ -1572,6 +1721,15 @@ function gachasoku_member_dashboard_shortcode() {
         </div>
         <input type="hidden" name="gachasoku_email_update_submit" value="1" />
       </form>
+    </section>
+
+    <section class="gachasoku-dashboard__section">
+      <h2 class="gachasoku-dashboard__title">開催中のキャンペーン</h2>
+      <?php echo gachasoku_render_campaign_cards($open_campaigns, [
+        'empty_message' => '現在開催中のキャンペーンはありません。',
+        'empty_class' => 'gachasoku-dashboard__empty',
+        'container_class' => 'gachasoku-campaigns gachasoku-campaigns--dashboard',
+      ]); ?>
     </section>
 
     <section class="gachasoku-dashboard__section">
@@ -1677,16 +1835,14 @@ function gachasoku_campaigns_shortcode($atts = []) {
   ];
 
   $campaigns = new WP_Query($query_args);
-  if (!$campaigns->have_posts()) {
-    return '<p class="gachasoku-campaigns__empty">キャンペーンは現在ありません。</p>';
-  }
+  $member_id = gachasoku_get_current_member_id();
+  $items = [];
 
-  ob_start();
-  echo gachasoku_render_membership_messages('campaign');
-  ?>
-  <div class="gachasoku-campaigns">
-    <?php while ($campaigns->have_posts()) : $campaigns->the_post();
-      $card = gachasoku_get_campaign_card_data(get_the_ID());
+  if ($campaigns->have_posts()) {
+    while ($campaigns->have_posts()) {
+      $campaigns->the_post();
+      $campaign_id = get_the_ID();
+      $card = gachasoku_get_campaign_card_data($campaign_id);
       if (!$card) {
         continue;
       }
@@ -1699,55 +1855,24 @@ function gachasoku_campaigns_shortcode($atts = []) {
         continue;
       }
 
-      $user_id = gachasoku_get_current_member_id();
-      $has_applied = false;
-      if ($user_id) {
-        $has_applied = gachasoku_user_has_applied(get_the_ID(), $user_id);
+      $item = gachasoku_build_campaign_item($campaign_id, $member_id);
+      if ($item) {
+        $items[] = $item;
       }
-      ?>
-      <article class="gachasoku-campaign-card">
-        <?php if ($card['image']) : ?>
-          <div class="gachasoku-campaign-card__image">
-            <?php if ($card['link']) : ?>
-              <a href="<?php echo esc_url($card['link']); ?>" target="_blank" rel="noopener noreferrer">
-                <img src="<?php echo esc_url($card['image']); ?>" alt="" />
-              </a>
-            <?php else : ?>
-              <img src="<?php echo esc_url($card['image']); ?>" alt="" />
-            <?php endif; ?>
-          </div>
-        <?php endif; ?>
-        <div class="gachasoku-campaign-card__body">
-          <h3 class="gachasoku-campaign-card__title"><?php echo esc_html($card['title']); ?></h3>
-          <div class="gachasoku-campaign-card__dates">
-            <?php if ($card['start']) : ?>
-              <span>開始：<?php echo esc_html(gachasoku_format_datetime($card['start'])); ?></span>
-            <?php endif; ?>
-            <?php if ($card['end']) : ?>
-              <span>終了：<?php echo esc_html(gachasoku_format_datetime($card['end'])); ?></span>
-            <?php endif; ?>
-          </div>
-          <?php if ($card['requirements']) : ?>
-            <div class="gachasoku-campaign-card__requirements">
-              <h4>応募条件</h4>
-              <?php echo wpautop(wp_kses_post($card['requirements'])); ?>
-            </div>
-          <?php endif; ?>
-          <div class="gachasoku-campaign-card__content">
-            <?php echo $card['content']; ?>
-          </div>
-          <div class="gachasoku-campaign-card__actions">
-            <?php if ($card['link']) : ?>
-              <a class="gachasoku-button gachasoku-button--outline" href="<?php echo esc_url($card['link']); ?>" target="_blank" rel="noopener noreferrer">キャンペーン詳細</a>
-            <?php endif; ?>
-            <?php echo gachasoku_render_campaign_action(get_the_ID(), $card, $has_applied); ?>
-          </div>
-        </div>
-      </article>
-    <?php endwhile; ?>
-  </div>
-  <?php
+    }
+  }
+
   wp_reset_postdata();
+
+  $output = gachasoku_render_campaign_cards($items, [
+    'empty_message' => 'キャンペーンは現在ありません。',
+    'apply_label' => '応募して公式サイトを開く',
+  ]);
+
+  ob_start();
+  echo gachasoku_render_membership_messages('campaign');
+  echo $output;
+
   return ob_get_clean();
 }
 
@@ -1758,7 +1883,15 @@ function gachasoku_user_has_applied($campaign_id, $user_id) {
   return !empty($exists);
 }
 
-function gachasoku_render_campaign_action($campaign_id, $card, $has_applied) {
+function gachasoku_render_campaign_action($campaign_id, $card, $has_applied, $args = []) {
+  $defaults = [
+    'nonce' => '',
+    'apply_label' => 'このキャンペーンに応募する',
+    'applied_label' => '応募済み',
+    'visit_label' => '公式サイトへ',
+  ];
+  $args = wp_parse_args($args, $defaults);
+
   if (!gachasoku_is_member_logged_in()) {
     return '<p class="gachasoku-campaign-card__notice">応募するにはログインしてください。</p>';
   }
@@ -1768,7 +1901,11 @@ function gachasoku_render_campaign_action($campaign_id, $card, $has_applied) {
   }
 
   if ($has_applied) {
-    return '<p class="gachasoku-campaign-card__notice">応募済みです。</p>';
+    $status_html = '<span class="gachasoku-campaign-card__status">' . esc_html($args['applied_label']) . '</span>';
+    if (!empty($card['link'])) {
+      $status_html .= ' <a class="gachasoku-button gachasoku-button--outline" href="' . esc_url($card['link']) . '" target="_blank" rel="noopener noreferrer">' . esc_html($args['visit_label']) . '</a>';
+    }
+    return $status_html;
   }
 
   $status = gachasoku_get_member_status(gachasoku_get_current_member_id());
@@ -1776,16 +1913,71 @@ function gachasoku_render_campaign_action($campaign_id, $card, $has_applied) {
     return '<p class="gachasoku-campaign-card__notice">現在のステータスでは応募できません。</p>';
   }
 
-  ob_start();
-  ?>
-  <form method="post" class="gachasoku-campaign-card__form">
-    <?php wp_nonce_field('gachasoku_campaign_apply', 'gachasoku_campaign_nonce'); ?>
-    <input type="hidden" name="gachasoku_campaign_id" value="<?php echo esc_attr($campaign_id); ?>" />
-    <input type="hidden" name="gachasoku_campaign_apply" value="1" />
-    <button type="submit" class="gachasoku-button">このキャンペーンに応募する</button>
-  </form>
-  <?php
-  return ob_get_clean();
+  if (empty($card['link'])) {
+    return '<p class="gachasoku-campaign-card__notice">応募リンクが設定されていません。</p>';
+  }
+
+  $attributes = [
+    'type="button"',
+    'class="gachasoku-button gachasoku-button--apply"',
+    'data-campaign-apply="1"',
+    'data-campaign-id="' . esc_attr($campaign_id) . '"',
+    'data-campaign-url="' . esc_url($card['link']) . '"',
+    'data-applied-label="' . esc_attr($args['applied_label']) . '"',
+    'data-visit-label="' . esc_attr($args['visit_label']) . '"',
+  ];
+
+  if (!empty($args['nonce'])) {
+    $attributes[] = 'data-campaign-nonce="' . esc_attr($args['nonce']) . '"';
+  }
+
+  return '<button ' . implode(' ', $attributes) . '>' . esc_html($args['apply_label']) . '</button>';
+}
+
+add_action('wp_ajax_gachasoku_apply_campaign', 'gachasoku_ajax_apply_campaign');
+add_action('wp_ajax_nopriv_gachasoku_apply_campaign', 'gachasoku_ajax_apply_campaign');
+function gachasoku_ajax_apply_campaign() {
+  $campaign_id = isset($_POST['campaign_id']) ? intval($_POST['campaign_id']) : 0;
+  $nonce = isset($_POST['nonce']) ? sanitize_text_field(wp_unslash($_POST['nonce'])) : '';
+
+  if (!$campaign_id || $nonce === '') {
+    wp_send_json_error(['message' => '不正なリクエストです。'], 400);
+  }
+
+  if (!wp_verify_nonce($nonce, 'gachasoku_apply_campaign_' . $campaign_id)) {
+    wp_send_json_error(['message' => 'リクエストの有効期限が切れました。再度お試しください。'], 400);
+  }
+
+  if (!gachasoku_is_member_logged_in()) {
+    wp_send_json_error(['message' => '応募にはログインが必要です。'], 403);
+  }
+
+  $user_id = gachasoku_get_current_member_id();
+  if (!$user_id) {
+    wp_send_json_error(['message' => '会員情報を取得できませんでした。'], 403);
+  }
+
+  $status = gachasoku_get_member_status($user_id);
+  if ($status !== GACHASOKU_MEMBER_STATUS_ACTIVE) {
+    wp_send_json_error(['message' => '現在のステータスでは応募できません。'], 403);
+  }
+
+  if (!gachasoku_is_campaign_open($campaign_id)) {
+    wp_send_json_error(['message' => 'このキャンペーンの募集は終了しています。'], 400);
+  }
+
+  $result = gachasoku_register_campaign_entry($campaign_id, $user_id);
+  if (is_wp_error($result)) {
+    wp_send_json_error(['message' => $result->get_error_message()], 400);
+  }
+
+  $card = gachasoku_get_campaign_card_data($campaign_id);
+  $link = ($card && !empty($card['link'])) ? $card['link'] : '';
+
+  wp_send_json_success([
+    'message' => 'キャンペーンに応募しました。結果発表をお待ちください。',
+    'url' => $link,
+  ]);
 }
 
 add_action('admin_menu', 'gachasoku_register_membership_admin_pages');
