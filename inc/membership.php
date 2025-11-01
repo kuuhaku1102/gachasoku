@@ -2380,156 +2380,187 @@ function gachasoku_render_draw_admin_page() {
   }
 
   $search = isset($_GET['s']) ? sanitize_text_field(wp_unslash($_GET['s'])) : '';
+  $selected_campaign_id = 0;
+
+  if (!empty($_POST['campaign_id'])) {
+    $selected_campaign_id = intval($_POST['campaign_id']);
+  } elseif (!empty($_GET['campaign_id'])) {
+    $selected_campaign_id = intval($_GET['campaign_id']);
+  }
 
   $query_args = [
     'post_type' => 'gachasoku_campaign',
-    'posts_per_page' => 20,
+    'posts_per_page' => 100,
     'post_status' => 'publish',
-    's' => $search,
+    'orderby' => 'date',
+    'order' => 'DESC',
   ];
 
-  $campaigns = new WP_Query($query_args);
+  if ($search) {
+    $query_args['s'] = $search;
+  }
+
+  $campaign_posts = get_posts($query_args);
+  $campaign_ids = [];
+
+  if (!empty($campaign_posts)) {
+    foreach ($campaign_posts as $campaign_post) {
+      $campaign_ids[] = $campaign_post->ID;
+    }
+
+    if (!$selected_campaign_id || !in_array($selected_campaign_id, $campaign_ids, true)) {
+      $selected_campaign_id = $campaign_ids[0];
+    }
+  } else {
+    $selected_campaign_id = 0;
+  }
   ?>
   <div class="wrap gachasoku-draw-admin">
     <h1>抽選管理</h1>
     <form method="get" class="gachasoku-draw-admin__filters">
       <input type="hidden" name="page" value="gachasoku-draws" />
       <input type="search" name="s" placeholder="キャンペーン名で検索" value="<?php echo esc_attr($search); ?>" />
-      <button type="submit" class="button">検索</button>
+      <select name="campaign_id" <?php disabled(empty($campaign_posts)); ?> onchange="this.form.submit()">
+        <?php if (empty($campaign_posts)) : ?>
+          <option value="">キャンペーンが見つかりません</option>
+        <?php else : ?>
+          <?php foreach ($campaign_posts as $campaign_post) : ?>
+            <option value="<?php echo esc_attr($campaign_post->ID); ?>" <?php selected($selected_campaign_id, $campaign_post->ID); ?>><?php echo esc_html(get_the_title($campaign_post)); ?></option>
+          <?php endforeach; ?>
+        <?php endif; ?>
+      </select>
+      <button type="submit" class="button">表示</button>
     </form>
     <?php settings_errors('gachasoku_draw_admin'); ?>
 
-    <?php if ($campaigns->have_posts()) : ?>
+    <?php if ($selected_campaign_id) :
+      $fields = gachasoku_get_campaign_fields($selected_campaign_id);
+      $entries_total = gachasoku_get_campaign_entry_count($selected_campaign_id);
+      $entries_waiting = gachasoku_get_campaign_entry_count($selected_campaign_id, 'applied');
+      $entries = gachasoku_get_campaign_entries_with_members($selected_campaign_id);
+      $last_logs = gachasoku_get_campaign_winner_logs($selected_campaign_id);
+      ?>
       <div class="gachasoku-draw-admin__list">
-        <?php while ($campaigns->have_posts()) : $campaigns->the_post();
-          $campaign_id = get_the_ID();
-          $fields = gachasoku_get_campaign_fields($campaign_id);
-          $entries_total = gachasoku_get_campaign_entry_count($campaign_id);
-          $entries_waiting = gachasoku_get_campaign_entry_count($campaign_id, 'applied');
-          $entries = gachasoku_get_campaign_entries_with_members($campaign_id);
-          $last_logs = gachasoku_get_campaign_winner_logs($campaign_id);
-          ?>
-          <section class="gachasoku-draw-admin__item">
-            <header class="gachasoku-draw-admin__header">
-              <h2><?php the_title(); ?></h2>
-              <p>応募数：<?php echo esc_html($entries_total); ?> / 抽選待ち：<?php echo esc_html($entries_waiting); ?></p>
-            </header>
-            <form method="post" class="gachasoku-draw-admin__form">
-              <?php wp_nonce_field('gachasoku_draw_' . $campaign_id, 'gachasoku_draw_nonce'); ?>
-              <input type="hidden" name="campaign_id" value="<?php echo esc_attr($campaign_id); ?>" />
-              <div class="gachasoku-draw-admin__form-grid">
-                <label>
-                  当選人数
-                  <input type="number" name="winner_count" min="1" value="<?php echo esc_attr($fields['max_winners']); ?>" />
-                </label>
-                <label class="gachasoku-draw-admin__checkbox">
-                  <input type="checkbox" name="reset_before_draw" value="1" />
-                  前回結果をリセットして再抽選する
-                </label>
-              </div>
-              <?php
-              $has_editable_entry = false;
-              if (!empty($entries)) {
-                foreach ($entries as $entry_check) {
-                  if ($entry_check['status'] === 'applied') {
-                    $has_editable_entry = true;
-                    break;
-                  }
+        <section class="gachasoku-draw-admin__item">
+          <header class="gachasoku-draw-admin__header">
+            <h2><?php echo esc_html(get_the_title($selected_campaign_id)); ?></h2>
+            <p>応募数：<?php echo esc_html($entries_total); ?> / 抽選待ち：<?php echo esc_html($entries_waiting); ?></p>
+          </header>
+          <form method="post" class="gachasoku-draw-admin__form">
+            <?php wp_nonce_field('gachasoku_draw_' . $selected_campaign_id, 'gachasoku_draw_nonce'); ?>
+            <input type="hidden" name="campaign_id" value="<?php echo esc_attr($selected_campaign_id); ?>" />
+            <input type="hidden" name="s" value="<?php echo esc_attr($search); ?>" />
+            <div class="gachasoku-draw-admin__form-grid">
+              <label>
+                当選人数
+                <input type="number" name="winner_count" min="1" value="<?php echo esc_attr($fields['max_winners']); ?>" />
+              </label>
+              <label class="gachasoku-draw-admin__checkbox">
+                <input type="checkbox" name="reset_before_draw" value="1" />
+                前回結果をリセットして再抽選する
+              </label>
+            </div>
+            <?php
+            $has_editable_entry = false;
+            if (!empty($entries)) {
+              foreach ($entries as $entry_check) {
+                if ($entry_check['status'] === 'applied') {
+                  $has_editable_entry = true;
+                  break;
                 }
               }
-              ?>
-              <?php if (!empty($entries)) : ?>
-                <?php $bulk_input_id = 'gachasoku-chance-bulk-' . $campaign_id; ?>
-                <div class="gachasoku-draw-admin__chance">
-                  <h3>応募者リスト / チャンスアップ</h3>
-                  <p class="description">倍率を設定すると抽選時の当選確率が上がります（1〜10）。当選・落選済みの応募は変更できません。</p>
-                  <div class="gachasoku-draw-admin__chance-bulk" aria-live="polite">
-                    <label for="<?php echo esc_attr($bulk_input_id); ?>">選択した応募の倍率</label>
-                    <input id="<?php echo esc_attr($bulk_input_id); ?>" type="number" min="1" max="10" value="1" data-chance-bulk-input />
-                    <button type="button" class="button" data-chance-bulk-apply>選択に適用</button>
-                    <button type="button" class="button" data-chance-bulk-clear>選択を解除</button>
-                  </div>
-                  <div class="gachasoku-draw-admin__chance-table-wrapper">
-                    <table class="gachasoku-draw-admin__chance-table">
-                      <thead>
-                        <tr>
-                          <th class="column-select"><input type="checkbox" data-chance-select-all aria-label="すべて選択" /></th>
-                          <th>会員</th>
-                          <th>ステータス</th>
-                          <th>倍率</th>
-                          <th>応募日時</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <?php foreach ($entries as $entry) :
-                          $label = gachasoku_translate_entry_status($entry['status']);
-                          $display_name = $entry['name'] ? $entry['name'] : 'ID: ' . intval($entry['user_id']);
-                          $weight_value = max(1, intval($entry['chance_weight']));
-                          $input_name = 'chance_weight[' . intval($entry['user_id']) . ']';
-                          $is_editable = ($entry['status'] === 'applied');
-                          ?>
-                          <tr class="<?php echo $is_editable ? '' : 'is-disabled'; ?>" data-chance-row>
-                            <td class="gachasoku-draw-admin__chance-select">
-                              <input type="checkbox" value="<?php echo esc_attr($entry['user_id']); ?>" <?php disabled(!$is_editable); ?> data-chance-select />
-                            </td>
-                            <td>
-                              <?php echo esc_html($display_name); ?>
-                            </td>
-                            <td><?php echo esc_html($label); ?></td>
-                            <td>
-                              <?php if ($is_editable) : ?>
-                                <input type="number" name="<?php echo esc_attr($input_name); ?>" min="1" max="10" value="<?php echo esc_attr($weight_value); ?>" data-chance-input />
-                              <?php else : ?>
-                                <span class="gachasoku-draw-admin__chance-value"><?php echo esc_html($weight_value); ?></span>
-                              <?php endif; ?>
-                            </td>
-                            <td><?php echo esc_html(gachasoku_format_datetime($entry['applied_at'])); ?></td>
-                          </tr>
-                        <?php endforeach; ?>
-                      </tbody>
-                    </table>
-                  </div>
+            }
+            ?>
+            <?php if (!empty($entries)) : ?>
+              <?php $bulk_input_id = 'gachasoku-chance-bulk-' . $selected_campaign_id; ?>
+              <div class="gachasoku-draw-admin__chance">
+                <h3>応募者リスト / チャンスアップ</h3>
+                <p class="description">倍率を設定すると抽選時の当選確率が上がります（1〜10）。当選・落選済みの応募は変更できません。</p>
+                <div class="gachasoku-draw-admin__chance-bulk" aria-live="polite">
+                  <label for="<?php echo esc_attr($bulk_input_id); ?>">選択した応募の倍率</label>
+                  <input id="<?php echo esc_attr($bulk_input_id); ?>" type="number" min="1" max="10" value="1" data-chance-bulk-input />
+                  <button type="button" class="button" data-chance-bulk-apply>選択に適用</button>
+                  <button type="button" class="button" data-chance-bulk-clear>選択を解除</button>
                 </div>
-              <?php else : ?>
-                <p class="gachasoku-draw-admin__empty">応募者がまだいません。</p>
-              <?php endif; ?>
-              <div class="gachasoku-draw-admin__actions">
-                <?php if ($has_editable_entry) : ?>
-                  <button type="submit" name="gachasoku_draw_action" value="update_chance" class="button">チャンスアップを保存</button>
-                <?php endif; ?>
-                <button type="submit" name="gachasoku_draw_action" value="run" class="button button-primary" <?php disabled($entries_waiting === 0); ?>>抽選を実行</button>
-                <button type="submit" name="gachasoku_draw_action" value="reset" class="button">応募状況をリセット</button>
+                <div class="gachasoku-draw-admin__chance-table-wrapper">
+                  <table class="gachasoku-draw-admin__chance-table">
+                    <thead>
+                      <tr>
+                        <th class="column-select"><input type="checkbox" data-chance-select-all aria-label="すべて選択" /></th>
+                        <th>会員</th>
+                        <th>ステータス</th>
+                        <th>倍率</th>
+                        <th>応募日時</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <?php foreach ($entries as $entry) :
+                        $label = gachasoku_translate_entry_status($entry['status']);
+                        $display_name = $entry['name'] ? $entry['name'] : 'ID: ' . intval($entry['user_id']);
+                        $weight_value = max(1, intval($entry['chance_weight']));
+                        $input_name = 'chance_weight[' . intval($entry['user_id']) . ']';
+                        $is_editable = ($entry['status'] === 'applied');
+                        ?>
+                        <tr class="<?php echo $is_editable ? '' : 'is-disabled'; ?>" data-chance-row>
+                          <td class="gachasoku-draw-admin__chance-select">
+                            <input type="checkbox" value="<?php echo esc_attr($entry['user_id']); ?>" <?php disabled(!$is_editable); ?> data-chance-select />
+                          </td>
+                          <td>
+                            <?php echo esc_html($display_name); ?>
+                          </td>
+                          <td><?php echo esc_html($label); ?></td>
+                          <td>
+                            <?php if ($is_editable) : ?>
+                              <input type="number" name="<?php echo esc_attr($input_name); ?>" min="1" max="10" value="<?php echo esc_attr($weight_value); ?>" data-chance-input />
+                            <?php else : ?>
+                              <span class="gachasoku-draw-admin__chance-value"><?php echo esc_html($weight_value); ?></span>
+                            <?php endif; ?>
+                          </td>
+                          <td><?php echo esc_html(gachasoku_format_datetime($entry['applied_at'])); ?></td>
+                        </tr>
+                      <?php endforeach; ?>
+                    </tbody>
+                  </table>
+                </div>
               </div>
-            </form>
-            <?php if (!empty($last_logs)) : ?>
-              <div class="gachasoku-draw-admin__logs">
-                <h3>抽選履歴</h3>
-                <ul>
-                  <?php foreach ($last_logs as $log) :
-                    $winner_ids = $log['winners'] ? json_decode($log['winners'], true) : [];
-                    $winner_names = gachasoku_get_campaign_winner_usernames(is_array($winner_ids) ? $winner_ids : []);
-                    ?>
-                    <li>
-                      <strong><?php echo esc_html(gachasoku_format_datetime($log['executed_at'])); ?></strong>
-                      <?php if (!empty($winner_names)) : ?>
-                        <span>当選者：<?php echo esc_html(implode(' / ', $winner_names)); ?></span>
-                      <?php else : ?>
-                        <span>当選者：該当なし</span>
-                      <?php endif; ?>
-                    </li>
-                  <?php endforeach; ?>
-                </ul>
-              </div>
+            <?php else : ?>
+              <p class="gachasoku-draw-admin__empty">応募者がまだいません。</p>
             <?php endif; ?>
-          </section>
-        <?php endwhile; ?>
+            <div class="gachasoku-draw-admin__actions">
+              <?php if ($has_editable_entry) : ?>
+                <button type="submit" name="gachasoku_draw_action" value="update_chance" class="button">チャンスアップを保存</button>
+              <?php endif; ?>
+              <button type="submit" name="gachasoku_draw_action" value="run" class="button button-primary" <?php disabled($entries_waiting === 0); ?>>抽選を実行</button>
+              <button type="submit" name="gachasoku_draw_action" value="reset" class="button">応募状況をリセット</button>
+            </div>
+          </form>
+          <?php if (!empty($last_logs)) : ?>
+            <div class="gachasoku-draw-admin__logs">
+              <h3>抽選履歴</h3>
+              <ul>
+                <?php foreach ($last_logs as $log) :
+                  $winner_ids = $log['winners'] ? json_decode($log['winners'], true) : [];
+                  $winner_names = gachasoku_get_campaign_winner_usernames(is_array($winner_ids) ? $winner_ids : []);
+                  ?>
+                  <li>
+                    <strong><?php echo esc_html(gachasoku_format_datetime($log['executed_at'])); ?></strong>
+                    <?php if (!empty($winner_names)) : ?>
+                      <span>当選者：<?php echo esc_html(implode(' / ', $winner_names)); ?></span>
+                    <?php else : ?>
+                      <span>当選者：該当なし</span>
+                    <?php endif; ?>
+                  </li>
+                <?php endforeach; ?>
+              </ul>
+            </div>
+          <?php endif; ?>
+        </section>
       </div>
     <?php else : ?>
-      <p>キャンペーンが見つかりませんでした。</p>
+      <p>該当するキャンペーンが見つかりませんでした。</p>
     <?php endif; ?>
   </div>
   <?php
-  wp_reset_postdata();
 }
 
 function gachasoku_handle_draw_action() {
