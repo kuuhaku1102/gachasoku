@@ -27,6 +27,7 @@ body {
   color: var(--text-color);
   margin: 0;
   line-height: 1.8;
+  overflow-x: hidden;
 }
 
 .container {
@@ -1053,6 +1054,9 @@ footer p {
 .gachasoku-calendar__table {
   display: grid;
   gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 8px;
+  -webkit-overflow-scrolling: touch;
 }
 
 .gachasoku-calendar__row {
@@ -1176,11 +1180,50 @@ footer p {
   }
 
   .gachasoku-calendar__row {
-    gap: 4px;
+    gap: 6px;
+    grid-template-columns: repeat(7, minmax(120px, 1fr));
   }
 
   .gachasoku-calendar__cell {
+    min-height: 95px;
     padding: 10px;
+  }
+
+  .gachasoku-calendar__day {
+    font-size: 16px;
+  }
+
+  .gachasoku-calendar__events {
+    gap: 4px;
+  }
+
+  .gachasoku-calendar__event {
+    font-size: 13px;
+    padding: 6px 8px;
+  }
+
+  .gachasoku-calendar__event-time,
+  .gachasoku-calendar__event-notes p {
+    font-size: 12px;
+  }
+}
+
+@media (max-width: 540px) {
+  .gachasoku-calendar__table {
+    gap: 6px;
+  }
+
+  .gachasoku-calendar__row {
+    grid-template-columns: repeat(7, minmax(105px, 1fr));
+  }
+
+  .gachasoku-calendar__cell {
+    min-height: 88px;
+    padding: 9px;
+  }
+
+  .gachasoku-calendar__event {
+    font-size: 12px;
   }
 }
 
@@ -1629,6 +1672,110 @@ footer p {
     text-transform: uppercase;
     margin-bottom: 6px;
     color: #6b7280;
+  }
+}
+
+@media (max-width: 599px) {
+  .container {
+    width: calc(100% - 32px);
+  }
+
+  .site-header {
+    padding: 12px 0;
+  }
+
+  .site-header__inner {
+    gap: 8px;
+  }
+
+  .site-header__title {
+    font-size: 1.35rem;
+  }
+
+  .site-header__description {
+    font-size: 0.78rem;
+  }
+
+  .site-header__toggle {
+    padding: 8px;
+  }
+
+  .oripa-index .section {
+    padding: 58px 0;
+  }
+
+  .oripa-index .section .container {
+    gap: 18px;
+  }
+
+  .oripa-index .section h2 {
+    font-size: 1.55rem;
+  }
+
+  .oripa-index .section p {
+    font-size: 0.94rem;
+  }
+
+  .oripa-index .hero h1 {
+    font-size: 2rem;
+  }
+
+  .oripa-index .hero p {
+    max-width: 100%;
+    font-size: 0.95rem;
+    margin-bottom: 24px;
+  }
+
+  .oripa-index .latest-posts__card {
+    border-radius: 16px;
+  }
+
+  .oripa-index .latest-posts__body {
+    padding: 18px;
+  }
+
+  .oripa-index .faq dt,
+  .oripa-index .faq dd {
+    padding: 16px 18px;
+  }
+
+  .gachasoku-campaign-card__body {
+    padding: 18px;
+  }
+
+  .gachasoku-campaign-card__requirements {
+    font-size: 0.9rem;
+  }
+
+  .ranking-card {
+    width: 100%;
+    padding: 16px;
+  }
+
+  .ranking-card__main {
+    gap: 12px;
+  }
+
+  .ranking-card__image {
+    max-width: 320px;
+    margin: 0 auto;
+  }
+
+  .ranking-card__metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .ranking-card__vote-note {
+    font-size: 0.75rem;
+  }
+
+  .gachasoku-calendar__pickup {
+    margin-top: 18px;
+  }
+
+  .gachasoku-calendar__pickup-button {
+    width: 100%;
   }
 }
 
