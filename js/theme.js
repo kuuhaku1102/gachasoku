@@ -46,7 +46,22 @@
       return;
     }
 
-    const getScrollAmount = () => track.clientWidth * 0.85;
+    const getGap = () => {
+      const styles = window.getComputedStyle(track);
+      const gapValue = styles.columnGap || styles.gap || styles.rowGap || '0';
+      const gap = parseFloat(gapValue);
+      return Number.isNaN(gap) ? 0 : gap;
+    };
+
+    const getScrollAmount = () => {
+      const firstItem = track.querySelector(':scope > li');
+
+      if (!firstItem) {
+        return track.clientWidth * 0.8;
+      }
+
+      return firstItem.getBoundingClientRect().width + getGap();
+    };
 
     const updateNavState = () => {
       if (!prev && !next) {
