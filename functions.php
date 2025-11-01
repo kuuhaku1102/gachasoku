@@ -1737,16 +1737,6 @@ function gachasoku_render_calendar($year, $month) {
         </div>
       <?php endforeach; ?>
     </div>
-    <?php if ($week_index > 1) : ?>
-      <button
-        type="button"
-        class="gachasoku-calendar__more"
-        data-calendar-more
-        data-more-label="次の週を表示"
-        data-more-final="すべての予定を表示"
-        hidden
-      >もっと見る</button>
-    <?php endif; ?>
     <?php $pickup_events = gachasoku_get_calendar_pickup_events(); ?>
     <?php if (!empty($pickup_events)) :
       $pickup = $pickup_events[0];
