@@ -125,6 +125,7 @@ body {
 .site-header__nav {
   display: flex;
   align-items: center;
+  gap: 24px;
 }
 
 .site-header__membership {
@@ -132,6 +133,22 @@ body {
   align-items: center;
   gap: 12px;
   margin-left: 24px;
+}
+
+.site-header__membership--desktop {
+  display: flex;
+}
+
+.site-header__membership--mobile {
+  display: none;
+  margin-left: 0;
+  width: 100%;
+  align-items: stretch;
+  justify-content: flex-start;
+  background: rgba(255, 255, 255, 0.92);
+  border-radius: 12px;
+  padding: 12px;
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.08);
 }
 
 .site-header__membership-link {
@@ -275,9 +292,26 @@ footer p {
 }
 
 @media (max-width: 960px) {
+  .site-header {
+    padding: 14px 0;
+  }
+
   .site-header__inner {
     flex-wrap: wrap;
-    row-gap: 16px;
+    align-items: center;
+    row-gap: 12px;
+  }
+
+  .site-header__branding {
+    flex: 1 1 100%;
+  }
+
+  .site-header__title {
+    font-size: 1.5rem;
+  }
+
+  .site-header__description {
+    font-size: 0.85rem;
   }
 
   .site-header__toggle {
@@ -289,23 +323,25 @@ footer p {
     display: none;
     width: 100%;
     order: 3;
+    flex-direction: column;
+    gap: 16px;
   }
 
   .site-header__nav.is-open {
-    display: block;
+    display: flex;
   }
 
-  .site-header__membership {
-    order: 4;
-    width: 100%;
-    margin-left: 0;
-    justify-content: flex-start;
-    flex-wrap: wrap;
+  .site-header__membership--desktop {
+    display: none;
+  }
+
+  .site-header__membership--mobile {
+    display: grid;
     gap: 10px;
   }
 
   .site-header__membership-link {
-    flex: 1 1 160px;
+    width: 100%;
     justify-content: center;
   }
 
