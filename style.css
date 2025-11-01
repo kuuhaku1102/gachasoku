@@ -1295,6 +1295,14 @@ footer p {
   gap: 28px;
 }
 
+.oripa-index .campaigns .gachasoku-campaigns {
+  margin-top: 32px;
+}
+
+.oripa-index .campaigns .gachasoku-campaign-card {
+  box-shadow: 0 16px 36px rgba(15, 23, 42, 0.1);
+}
+
 .oripa-index .latest-oripa .container {
   gap: 36px;
 }

@@ -23,6 +23,14 @@ get_header();
     </div>
   </section>
 
+  <section id="campaigns" class="campaigns section">
+    <div class="container">
+      <h2>現在開催中のキャンペーン</h2>
+      <p>今すぐ参加できるお得なキャンペーン情報をチェックし、気になる企画に応募しましょう。</p>
+      <?php echo do_shortcode('[gachasoku_campaigns status="open"]'); ?>
+    </div>
+  </section>
+
   <section id="latest" class="latest-oripa section">
     <div class="container">
       <h2>オリパ最新ガチャ情報</h2>
