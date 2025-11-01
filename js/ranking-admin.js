@@ -1,4 +1,8 @@
 (function($) {
+  function generateEntryId() {
+    return 'rk_' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
+  }
+
   function refreshEntries() {
     $('#gachasoku-ranking-entries .gachasoku-ranking-entry').each(function(index) {
       $(this).attr('data-index', index);
@@ -20,7 +24,13 @@
     }
     var newIndex = $('#gachasoku-ranking-entries .gachasoku-ranking-entry').length;
     var compiled = template.replace(/__INDEX__/g, newIndex);
-    $('#gachasoku-ranking-entries').append(compiled);
+    var $entry = $(compiled);
+    $entry.find('input[name$="[id]"]').each(function() {
+      if (!$(this).val()) {
+        $(this).val(generateEntryId());
+      }
+    });
+    $('#gachasoku-ranking-entries').append($entry);
     refreshEntries();
   }
 
