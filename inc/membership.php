@@ -2211,6 +2211,16 @@ function gachasoku_enqueue_member_admin_assets($hook) {
     [],
     wp_get_theme()->get('Version')
   );
+
+  if ($hook === 'gachasoku-members_page_gachasoku-draws') {
+    wp_enqueue_script(
+      'gachasoku-draw-admin',
+      get_template_directory_uri() . '/js/draw-admin.js',
+      [],
+      wp_get_theme()->get('Version'),
+      true
+    );
+  }
 }
 
 function gachasoku_render_member_admin_page() {
@@ -2429,13 +2439,21 @@ function gachasoku_render_draw_admin_page() {
               }
               ?>
               <?php if (!empty($entries)) : ?>
+                <?php $bulk_input_id = 'gachasoku-chance-bulk-' . $campaign_id; ?>
                 <div class="gachasoku-draw-admin__chance">
                   <h3>応募者リスト / チャンスアップ</h3>
                   <p class="description">倍率を設定すると抽選時の当選確率が上がります（1〜10）。当選・落選済みの応募は変更できません。</p>
+                  <div class="gachasoku-draw-admin__chance-bulk" aria-live="polite">
+                    <label for="<?php echo esc_attr($bulk_input_id); ?>">選択した応募の倍率</label>
+                    <input id="<?php echo esc_attr($bulk_input_id); ?>" type="number" min="1" max="10" value="1" data-chance-bulk-input />
+                    <button type="button" class="button" data-chance-bulk-apply>選択に適用</button>
+                    <button type="button" class="button" data-chance-bulk-clear>選択を解除</button>
+                  </div>
                   <div class="gachasoku-draw-admin__chance-table-wrapper">
                     <table class="gachasoku-draw-admin__chance-table">
                       <thead>
                         <tr>
+                          <th class="column-select"><input type="checkbox" data-chance-select-all aria-label="すべて選択" /></th>
                           <th>会員</th>
                           <th>ステータス</th>
                           <th>倍率</th>
@@ -2445,22 +2463,22 @@ function gachasoku_render_draw_admin_page() {
                       <tbody>
                         <?php foreach ($entries as $entry) :
                           $label = gachasoku_translate_entry_status($entry['status']);
-                          $display_name = $entry['name'] ? $entry['name'] : $entry['email'];
+                          $display_name = $entry['name'] ? $entry['name'] : 'ID: ' . intval($entry['user_id']);
                           $weight_value = max(1, intval($entry['chance_weight']));
                           $input_name = 'chance_weight[' . intval($entry['user_id']) . ']';
                           $is_editable = ($entry['status'] === 'applied');
                           ?>
-                          <tr class="<?php echo $is_editable ? '' : 'is-disabled'; ?>">
+                          <tr class="<?php echo $is_editable ? '' : 'is-disabled'; ?>" data-chance-row>
+                            <td class="gachasoku-draw-admin__chance-select">
+                              <input type="checkbox" value="<?php echo esc_attr($entry['user_id']); ?>" <?php disabled(!$is_editable); ?> data-chance-select />
+                            </td>
                             <td>
                               <?php echo esc_html($display_name); ?>
-                              <?php if ($entry['email'] && $entry['name']) : ?>
-                                <br /><small><?php echo esc_html($entry['email']); ?></small>
-                              <?php endif; ?>
                             </td>
                             <td><?php echo esc_html($label); ?></td>
                             <td>
                               <?php if ($is_editable) : ?>
-                                <input type="number" name="<?php echo esc_attr($input_name); ?>" min="1" max="10" value="<?php echo esc_attr($weight_value); ?>" />
+                                <input type="number" name="<?php echo esc_attr($input_name); ?>" min="1" max="10" value="<?php echo esc_attr($weight_value); ?>" data-chance-input />
                               <?php else : ?>
                                 <span class="gachasoku-draw-admin__chance-value"><?php echo esc_html($weight_value); ?></span>
                               <?php endif; ?>
