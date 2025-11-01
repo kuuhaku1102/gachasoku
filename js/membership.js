@@ -24,10 +24,13 @@
     genericError: '投票中にエラーが発生しました。時間をおいて再度お試しください。',
   }, settings.vote || {});
 
+  const hitSettings = settings.hits || {};
+  const hitPosts = hitSettings && typeof hitSettings.posts === 'object' ? hitSettings.posts : {};
   const campaignButtons = document.querySelectorAll('[data-campaign-apply]');
   const voteForm = document.querySelector('[data-member-vote-form]');
+  const hitForm = document.querySelector('[data-hit-form]');
 
-  if (!campaignButtons.length && !voteForm) {
+  if (!campaignButtons.length && !voteForm && !hitForm) {
     return;
   }
 
@@ -171,6 +174,36 @@
       tbody.appendChild(row);
     });
   };
+
+  if (hitForm) {
+    const entrySelect = hitForm.querySelector('[data-hit-entry]');
+    const textarea = hitForm.querySelector('[data-hit-content]');
+
+    const resolveContent = (entryId) => {
+      if (!entryId || !hitPosts || typeof hitPosts !== 'object') {
+        return '';
+      }
+      const record = hitPosts[entryId];
+      if (!record || typeof record !== 'object') {
+        return '';
+      }
+      return typeof record.content === 'string' ? record.content : '';
+    };
+
+    const updateContent = () => {
+      if (!textarea) {
+        return;
+      }
+      const entryId = entrySelect ? entrySelect.value : '';
+      textarea.value = resolveContent(entryId);
+    };
+
+    if (entrySelect) {
+      entrySelect.addEventListener('change', updateContent);
+    }
+
+    updateContent();
+  }
 
   if (campaignButtons.length) {
     const updateButtonState = (button, url) => {

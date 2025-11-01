@@ -39,6 +39,14 @@ get_header();
     </div>
   </section>
 
+  <section id="hit-board" class="hit-board section">
+    <div class="container">
+      <h2>みんなの当たり投稿</h2>
+      <p>会員みんなの当たり報告をピックアップ！気になるサイトの最新当たりカードをチェックしよう。</p>
+      <?php echo do_shortcode('[gachasoku_hit_posts limit="5"]'); ?>
+    </div>
+  </section>
+
   <section id="calendar" class="calendar section">
     <div class="container">
       <h2>オリパイベントカレンダー</h2>

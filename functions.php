@@ -21,6 +21,13 @@ add_action('wp_enqueue_scripts', function() {
     '1.0.0',
     true
   );
+  $hit_posts_map = [];
+  if (function_exists('gachasoku_is_member_logged_in') && gachasoku_is_member_logged_in() && function_exists('gachasoku_get_current_member_id')) {
+    $member_id = gachasoku_get_current_member_id();
+    if ($member_id && function_exists('gachasoku_get_member_hit_posts_map')) {
+      $hit_posts_map = gachasoku_get_member_hit_posts_map($member_id);
+    }
+  }
   wp_localize_script(
     'gachasoku-membership',
     'gachasokuMembership',
@@ -42,6 +49,9 @@ add_action('wp_enqueue_scripts', function() {
         'success'      => '投票を受け付けました。',
         'cooldown'     => '同じランキングには1時間に1度しか投票できません。',
         'genericError' => '投票中にエラーが発生しました。時間をおいて再度お試しください。',
+      ],
+      'hits'    => [
+        'posts' => $hit_posts_map,
       ],
     ]
   );
