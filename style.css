@@ -304,7 +304,9 @@ footer p {
   }
 
   .site-header__branding {
-    flex: 1 1 100%;
+    flex: 1 1 auto;
+    min-width: 0;
+    order: 1;
   }
 
   .site-header__title {
@@ -318,6 +320,7 @@ footer p {
   .site-header__toggle {
     display: inline-flex;
     order: 2;
+    margin-left: auto;
   }
 
   .site-header__nav {
