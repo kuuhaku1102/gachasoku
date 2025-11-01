@@ -121,8 +121,21 @@
   calendars.forEach((calendar) => {
     const weeks = Array.from(calendar.querySelectorAll('[data-calendar-week]'));
     const trigger = calendar.querySelector('[data-calendar-more]');
+    const dayCells = Array.from(
+      calendar.querySelectorAll(
+        '.gachasoku-calendar__cell:not(.gachasoku-calendar__cell--head):not(.gachasoku-calendar__cell--empty)'
+      )
+    ).map((cell) => {
+      const dayEl = cell.querySelector('.gachasoku-calendar__day');
+      const day = dayEl ? parseInt(dayEl.textContent, 10) : NaN;
 
-    if (!trigger || weeks.length <= 1) {
+      return {
+        cell,
+        day,
+      };
+    }).filter((item) => Number.isFinite(item.day));
+
+    if (!trigger || weeks.length <= 1 || !dayCells.length) {
       return;
     }
 
@@ -130,43 +143,49 @@
     const baseLabel = trigger.dataset.moreLabel || trigger.textContent.trim() || 'もっと見る';
     const finalLabel = trigger.dataset.moreFinal || baseLabel;
 
-    let visibleWeeks = 1;
+    const segments = (() => {
+      const maxDay = dayCells.reduce((acc, item) => Math.max(acc, item.day), 0);
 
-    const updateMobileView = () => {
-      visibleWeeks = Math.min(Math.max(visibleWeeks, 1), weeks.length);
+      if (!maxDay) {
+        return [];
+      }
 
-      weeks.forEach((week, index) => {
-        week.hidden = index >= visibleWeeks;
-      });
+      const result = [];
+      const chunkSize = 10;
+      let start = 1;
 
-      const hasMore = visibleWeeks < weeks.length;
-      const remaining = weeks.length - visibleWeeks;
+      while (start <= maxDay) {
+        let end = Math.min(start + chunkSize - 1, maxDay);
+        const remaining = maxDay - end;
 
-      if (hasMore) {
-        trigger.hidden = false;
-        trigger.setAttribute('aria-expanded', 'false');
-
-        if (trigger.dataset.moreLabel && trigger.dataset.moreLabel.includes('%d')) {
-          trigger.textContent = trigger.dataset.moreLabel.replace('%d', remaining);
-        } else if (trigger.dataset.moreLabel) {
-          trigger.textContent = trigger.dataset.moreLabel;
-        } else {
-          trigger.textContent = baseLabel;
+        if (remaining > 0 && remaining < chunkSize) {
+          end = maxDay;
+          result.push({ start, end });
+          break;
         }
 
-        calendar.classList.add('gachasoku-calendar--collapsed');
-        calendar.classList.remove('gachasoku-calendar--expanded');
-      } else {
-        trigger.hidden = true;
-        trigger.setAttribute('aria-expanded', 'true');
-        trigger.textContent = finalLabel;
-
-        calendar.classList.remove('gachasoku-calendar--collapsed');
-        calendar.classList.add('gachasoku-calendar--expanded');
+        result.push({ start, end });
+        start = end + 1;
       }
-    };
 
-    const showAllWeeks = () => {
+      return result;
+    })();
+
+    if (segments.length <= 1) {
+      trigger.hidden = true;
+      trigger.setAttribute('aria-expanded', 'true');
+      trigger.textContent = finalLabel;
+      return;
+    }
+
+    let currentSegment = 0;
+    let lastMatch = mq.matches;
+
+    const showAll = () => {
+      dayCells.forEach(({ cell }) => {
+        cell.hidden = false;
+      });
+
       weeks.forEach((week) => {
         week.hidden = false;
       });
@@ -179,12 +198,55 @@
       calendar.classList.add('gachasoku-calendar--expanded');
     };
 
-    const syncState = () => {
-      if (mq.matches) {
-        updateMobileView();
+    const applySegment = () => {
+      const segment = segments[currentSegment];
+
+      dayCells.forEach(({ cell, day }) => {
+        const inRange = day >= segment.start && day <= segment.end;
+        cell.hidden = !inRange;
+      });
+
+      weeks.forEach((week) => {
+        const hasVisibleDay = Array.from(
+          week.querySelectorAll(
+            '.gachasoku-calendar__cell:not(.gachasoku-calendar__cell--head):not(.gachasoku-calendar__cell--empty)'
+          )
+        ).some((cell) => !cell.hidden);
+
+        week.hidden = !hasVisibleDay;
+      });
+
+      const hasMore = currentSegment < segments.length - 1;
+
+      trigger.hidden = !hasMore;
+      trigger.setAttribute('aria-expanded', hasMore ? 'false' : 'true');
+      trigger.textContent = hasMore
+        ? `${segments[currentSegment + 1].start}日〜${segments[currentSegment + 1].end}日を表示`
+        : finalLabel;
+
+      if (hasMore) {
+        calendar.classList.add('gachasoku-calendar--collapsed');
+        calendar.classList.remove('gachasoku-calendar--expanded');
       } else {
-        showAllWeeks();
+        calendar.classList.remove('gachasoku-calendar--collapsed');
+        calendar.classList.add('gachasoku-calendar--expanded');
       }
+    };
+
+    const syncState = () => {
+      const matches = mq.matches;
+
+      if (!matches) {
+        showAll();
+      } else {
+        if (!lastMatch) {
+          currentSegment = 0;
+        }
+
+        applySegment();
+      }
+
+      lastMatch = matches;
     };
 
     trigger.addEventListener('click', (event) => {
@@ -194,9 +256,9 @@
 
       event.preventDefault();
 
-      if (visibleWeeks < weeks.length) {
-        visibleWeeks += 1;
-        updateMobileView();
+      if (currentSegment < segments.length - 1) {
+        currentSegment += 1;
+        applySegment();
       }
     });
 
