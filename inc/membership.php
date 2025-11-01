@@ -446,16 +446,28 @@ function gachasoku_delete_member_sessions($member_id) {
   $wpdb->delete($table, ['member_id' => intval($member_id)], ['%d']);
 }
 
+function gachasoku_send_member_cookie($value, $expire_timestamp) {
+  if (headers_sent()) {
+    return false;
+  }
+
+  $secure = is_ssl();
+  setcookie(GACHASOKU_MEMBER_SESSION_COOKIE, $value, $expire_timestamp, COOKIEPATH, COOKIE_DOMAIN, $secure, true);
+  if (COOKIEPATH !== SITECOOKIEPATH) {
+    setcookie(GACHASOKU_MEMBER_SESSION_COOKIE, $value, $expire_timestamp, SITECOOKIEPATH, COOKIE_DOMAIN, $secure, true);
+  }
+
+  return true;
+}
+
 function gachasoku_clear_member_cookie() {
   $cookie_name = GACHASOKU_MEMBER_SESSION_COOKIE;
   if (isset($_COOKIE[$cookie_name])) {
     unset($_COOKIE[$cookie_name]);
   }
+
   $expire = time() - HOUR_IN_SECONDS;
-  setcookie($cookie_name, '', $expire, COOKIEPATH, COOKIE_DOMAIN, is_ssl(), true);
-  if (COOKIEPATH !== SITECOOKIEPATH) {
-    setcookie($cookie_name, '', $expire, SITECOOKIEPATH, COOKIE_DOMAIN, is_ssl(), true);
-  }
+  gachasoku_send_member_cookie('', $expire);
 }
 
 function gachasoku_member_login($member, $remember = false) {
@@ -488,9 +500,10 @@ function gachasoku_member_login($member, $remember = false) {
   );
 
   $expire_cookie = $expires_timestamp;
-  setcookie(GACHASOKU_MEMBER_SESSION_COOKIE, $token, $expire_cookie, COOKIEPATH, COOKIE_DOMAIN, is_ssl(), true);
-  if (COOKIEPATH !== SITECOOKIEPATH) {
-    setcookie(GACHASOKU_MEMBER_SESSION_COOKIE, $token, $expire_cookie, SITECOOKIEPATH, COOKIE_DOMAIN, is_ssl(), true);
+  if (!gachasoku_send_member_cookie($token, $expire_cookie)) {
+    // Fall back to a shorter session in case headers were already sent.
+    gachasoku_add_membership_message('login', 'error', 'セッションを初期化できませんでした。ページを再読み込みしてから再度お試しください。');
+    return false;
   }
 
   gachasoku_update_member($member['id'], ['last_login' => $created]);
@@ -961,6 +974,11 @@ function gachasoku_render_membership_messages($context) {
   return ob_get_clean();
 }
 
+add_action('init', 'gachasoku_prime_member_session', 5);
+function gachasoku_prime_member_session() {
+  gachasoku_get_current_member();
+}
+
 add_action('init', 'gachasoku_handle_membership_requests');
 function gachasoku_handle_membership_requests() {
   if (isset($_GET['gachasoku_member_logout'])) {
@@ -1037,7 +1055,10 @@ function gachasoku_handle_registration() {
 
   $member = gachasoku_get_member_by_id($member_id);
   if ($member) {
-    gachasoku_member_login($member);
+    if (!gachasoku_member_login($member)) {
+      gachasoku_add_membership_message('register', 'error', 'セッション情報を保存できませんでした。ページを再読み込みしてから再度ログインしてください。');
+      return;
+    }
   }
 
   gachasoku_add_membership_message('register', 'success', '会員登録が完了しました。マイページからキャンペーンに応募できます。');
@@ -1078,7 +1099,9 @@ function gachasoku_handle_login() {
   }
 
   $remember = !empty($_POST['gachasoku_login_remember']);
-  gachasoku_member_login($member, $remember);
+  if (!gachasoku_member_login($member, $remember)) {
+    return;
+  }
 
   gachasoku_add_membership_message('login', 'success', 'ログインに成功しました。');
 }
