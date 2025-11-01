@@ -2336,6 +2336,79 @@ footer p {
   font-weight: 600;
 }
 
+.gachasoku-dashboard [hidden] {
+  display: none !important;
+}
+
+.gachasoku-dashboard__vote-form {
+  margin-top: 24px;
+}
+
+.gachasoku-dashboard__vote-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: flex-end;
+}
+
+.gachasoku-dashboard__vote-field {
+  flex: 1 1 220px;
+}
+
+.gachasoku-dashboard__vote-actions {
+  display: flex;
+  align-items: center;
+  padding-bottom: 4px;
+}
+
+.gachasoku-dashboard__vote-actions .gachasoku-button {
+  min-width: 160px;
+}
+
+.gachasoku-dashboard__vote-note {
+  margin: 12px 0 0;
+  font-size: 0.85rem;
+  color: rgba(15, 23, 42, 0.7);
+}
+
+.gachasoku-dashboard__vote-message {
+  margin-top: 8px;
+  font-size: 0.9rem;
+  color: var(--link-color);
+  font-weight: 600;
+}
+
+.gachasoku-dashboard__vote-message.is-error {
+  color: #c0392b;
+}
+
+.gachasoku-dashboard__vote-disabled {
+  margin-top: 16px;
+  font-size: 0.9rem;
+  color: #c0392b;
+  font-weight: 600;
+}
+
+.gachasoku-dashboard__ranking-personal {
+  display: block;
+}
+
+@media (max-width: 767px) {
+  .gachasoku-dashboard__vote-grid {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .gachasoku-dashboard__vote-actions {
+    padding-bottom: 0;
+    justify-content: flex-end;
+  }
+
+  .gachasoku-dashboard__vote-actions .gachasoku-button {
+    width: 100%;
+  }
+}
+
 @media (max-width: 960px) {
   .gachasoku-campaign-card {
     grid-template-columns: 1fr;

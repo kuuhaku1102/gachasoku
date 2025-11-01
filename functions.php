@@ -35,6 +35,14 @@ add_action('wp_enqueue_scripts', function() {
         'applied' => '応募済み',
         'visit'   => '公式サイトへ',
       ],
+      'vote'     => [
+        'missingEntry' => 'ランキングを選択してください。',
+        'missingType'  => '投票内容を選択してください。',
+        'missingNonce' => '投票情報を取得できませんでした。',
+        'success'      => '投票を受け付けました。',
+        'cooldown'     => '同じランキングには1時間に1度しか投票できません。',
+        'genericError' => '投票中にエラーが発生しました。時間をおいて再度お試しください。',
+      ],
     ]
   );
 
