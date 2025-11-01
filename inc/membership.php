@@ -1724,7 +1724,7 @@ function gachasoku_register_form_shortcode() {
     <?php wp_nonce_field('gachasoku_register', 'gachasoku_register_nonce'); ?>
     <div class="gachasoku-form__field">
       <label for="gachasoku_register_name">お名前</label>
-      <input type="text" name="gachasoku_register_name" id="gachasoku_register_name" required />
+      <input type="text" name="gachasoku_register_name" id="gachasoku_register_name" required placeholder="X名をご入力ください" />
     </div>
     <div class="gachasoku-form__field">
       <label for="gachasoku_register_email">メールアドレス</label>

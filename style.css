@@ -493,8 +493,10 @@ footer p {
   flex-direction: column;
   gap: 16px;
   min-height: 0;
-  width: min(520px, calc(100% - 32px));
+  width: 100%;
+  max-width: 520px;
   margin: 0 auto;
+  box-sizing: border-box;
 }
 
 .ranking-card--has-badge {
@@ -735,7 +737,7 @@ footer p {
 
 .ranking-card__actions {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
   gap: 10px;
   width: 100%;
 }
@@ -744,15 +746,17 @@ footer p {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 9px 14px;
-  border-radius: 16px;
+  padding: 10px 12px;
+  border-radius: 14px;
   font-weight: 700;
+  font-size: 0.92rem;
   text-decoration: none;
   transition: var(--transition);
   box-shadow: 0 6px 16px rgba(15, 23, 42, 0.12);
   width: 100%;
   white-space: normal;
   text-align: center;
+  box-sizing: border-box;
 }
 
 .ranking-card__button--detail {
@@ -1176,6 +1180,38 @@ footer p {
   color: #1f2937;
 }
 
+.gachasoku-calendar__more {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin: 16px auto 0;
+  padding: 10px 18px;
+  border-radius: 999px;
+  border: 1px solid #cbd5f5;
+  background: #fff;
+  color: #1e293b;
+  font-weight: 600;
+  font-size: 0.95rem;
+  box-shadow: 0 10px 20px rgba(15, 23, 42, 0.08);
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.gachasoku-calendar__more:hover,
+.gachasoku-calendar__more:focus {
+  background: #eef2ff;
+  color: #1e293b;
+  outline: none;
+}
+
+.gachasoku-calendar--collapsed .gachasoku-calendar__table {
+  margin-bottom: 8px;
+}
+
+.gachasoku-calendar--expanded .gachasoku-calendar__more {
+  display: none;
+}
+
 @media (max-width: 768px) {
   .gachasoku-calendar {
     padding: 16px;
@@ -1190,6 +1226,10 @@ footer p {
     grid-template-columns: 1fr;
     gap: 12px;
     overflow: visible;
+  }
+
+  .gachasoku-calendar__more {
+    width: 100%;
   }
 
   .gachasoku-calendar__row {
