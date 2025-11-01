@@ -1671,7 +1671,12 @@ function gachasoku_render_calendar($year, $month) {
 
   ob_start();
   ?>
-  <div class="gachasoku-calendar" data-calendar>
+  <div
+    class="gachasoku-calendar"
+    data-calendar
+    data-calendar-year="<?php echo esc_attr($year); ?>"
+    data-calendar-month="<?php echo esc_attr($month); ?>"
+  >
     <header class="gachasoku-calendar__header">
       <h2 class="gachasoku-calendar__title"><?php echo esc_html($month_label); ?></h2>
     </header>
