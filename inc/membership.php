@@ -14,7 +14,7 @@ if (!defined('GACHASOKU_MEMBER_STATUS_WITHDRAWN')) {
 }
 
 if (!defined('GACHASOKU_MEMBERSHIP_DB_VERSION')) {
-  define('GACHASOKU_MEMBERSHIP_DB_VERSION', '2.1.0');
+  define('GACHASOKU_MEMBERSHIP_DB_VERSION', '2.2.0');
 }
 
 if (!defined('GACHASOKU_MEMBERSHIP_PAGES_VERSION')) {
@@ -643,6 +643,7 @@ function gachasoku_install_membership_tables() {
     campaign_id bigint(20) unsigned NOT NULL,
     user_id bigint(20) unsigned NOT NULL,
     status varchar(20) NOT NULL,
+    chance_weight int(11) unsigned NOT NULL DEFAULT 1,
     applied_at datetime NOT NULL,
     updated_at datetime NOT NULL,
     result_at datetime NULL,
@@ -1255,10 +1256,11 @@ function gachasoku_register_campaign_entry($campaign_id, $user_id) {
       'campaign_id' => $campaign_id,
       'user_id' => $user_id,
       'status' => 'applied',
+      'chance_weight' => 1,
       'applied_at' => $now,
       'updated_at' => $now,
     ],
-    ['%d', '%d', '%s', '%s', '%s']
+    ['%d', '%d', '%s', '%d', '%s', '%s']
   );
 
   if ($inserted === false) {
@@ -1542,6 +1544,23 @@ function gachasoku_get_campaign_entry_count($campaign_id, $status = null) {
   return (int) $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM {$table} WHERE campaign_id = %d", $campaign_id));
 }
 
+function gachasoku_get_campaign_entries_with_members($campaign_id) {
+  global $wpdb;
+
+  $entries_table = $wpdb->prefix . 'gachasoku_campaign_entries';
+  $members_table = gachasoku_get_members_table();
+
+  $results = $wpdb->get_results(
+    $wpdb->prepare(
+      "SELECT e.user_id, e.status, e.applied_at, e.updated_at, e.result_at, e.chance_weight, m.name, m.email FROM {$entries_table} e LEFT JOIN {$members_table} m ON m.id = e.user_id WHERE e.campaign_id = %d ORDER BY e.applied_at ASC",
+      $campaign_id
+    ),
+    ARRAY_A
+  );
+
+  return $results ? $results : [];
+}
+
 function gachasoku_get_campaign_winner_logs($campaign_id, $limit = 5) {
   global $wpdb;
   $table = $wpdb->prefix . 'gachasoku_campaign_draw_logs';
@@ -1591,26 +1610,102 @@ function gachasoku_get_campaign_winner_usernames($winner_ids) {
   return $names;
 }
 
+function gachasoku_update_campaign_chance_weights($campaign_id, $weights) {
+  global $wpdb;
+
+  $campaign_id = intval($campaign_id);
+  if (!$campaign_id || empty($weights) || !is_array($weights)) {
+    return 0;
+  }
+
+  $table = $wpdb->prefix . 'gachasoku_campaign_entries';
+  $now = current_time('mysql');
+  $updated = 0;
+
+  foreach ($weights as $user_id => $weight) {
+    $user_id = intval($user_id);
+    if (!$user_id) {
+      continue;
+    }
+
+    $weight = intval($weight);
+    if ($weight < 1) {
+      $weight = 1;
+    } elseif ($weight > 10) {
+      $weight = 10;
+    }
+
+    $result = $wpdb->update(
+      $table,
+      [
+        'chance_weight' => $weight,
+        'updated_at' => $now,
+      ],
+      [
+        'campaign_id' => $campaign_id,
+        'user_id' => $user_id,
+      ],
+      ['%d', '%s'],
+      ['%d', '%d']
+    );
+
+    if ($result !== false) {
+      $updated += $result;
+    }
+  }
+
+  return $updated;
+}
+
 function gachasoku_select_campaign_winners($campaign_id, $max_winners) {
   global $wpdb;
   $table = $wpdb->prefix . 'gachasoku_campaign_entries';
-  $ids = $wpdb->get_col($wpdb->prepare("SELECT user_id FROM {$table} WHERE campaign_id = %d AND status = %s", $campaign_id, 'applied'));
-  if (empty($ids)) {
+  $rows = $wpdb->get_results($wpdb->prepare("SELECT user_id, chance_weight FROM {$table} WHERE campaign_id = %d AND status = %s", $campaign_id, 'applied'), ARRAY_A);
+  if (empty($rows)) {
     return [];
   }
 
-  if ($max_winners <= 0 || $max_winners >= count($ids)) {
-    return $ids;
+  if ($max_winners <= 0 || $max_winners >= count($rows)) {
+    return array_map(static function ($row) {
+      return intval($row['user_id']);
+    }, $rows);
   }
 
-  $random_keys = array_rand($ids, $max_winners);
-  if (!is_array($random_keys)) {
-    $random_keys = [$random_keys];
+  $pool = [];
+  foreach ($rows as $row) {
+    $pool[] = [
+      'user_id' => intval($row['user_id']),
+      'weight' => max(1, intval($row['chance_weight'])),
+    ];
   }
 
   $winners = [];
-  foreach ($random_keys as $key) {
-    $winners[] = $ids[$key];
+
+  while (count($winners) < $max_winners && !empty($pool)) {
+    $total_weight = 0;
+    foreach ($pool as $item) {
+      $total_weight += $item['weight'];
+    }
+
+    if ($total_weight <= 0) {
+      // If all weights somehow become zero, fall back to equal probability.
+      $index = array_rand($pool);
+    } else {
+      $target = random_int(1, $total_weight);
+      $running = 0;
+      $index = 0;
+      foreach ($pool as $i => $item) {
+        $running += $item['weight'];
+        if ($target <= $running) {
+          $index = $i;
+          break;
+        }
+      }
+    }
+
+    $selected = $pool[$index];
+    $winners[] = $selected['user_id'];
+    array_splice($pool, $index, 1);
   }
 
   return $winners;
@@ -2301,6 +2396,7 @@ function gachasoku_render_draw_admin_page() {
           $fields = gachasoku_get_campaign_fields($campaign_id);
           $entries_total = gachasoku_get_campaign_entry_count($campaign_id);
           $entries_waiting = gachasoku_get_campaign_entry_count($campaign_id, 'applied');
+          $entries = gachasoku_get_campaign_entries_with_members($campaign_id);
           $last_logs = gachasoku_get_campaign_winner_logs($campaign_id);
           ?>
           <section class="gachasoku-draw-admin__item">
@@ -2321,7 +2417,68 @@ function gachasoku_render_draw_admin_page() {
                   前回結果をリセットして再抽選する
                 </label>
               </div>
+              <?php
+              $has_editable_entry = false;
+              if (!empty($entries)) {
+                foreach ($entries as $entry_check) {
+                  if ($entry_check['status'] === 'applied') {
+                    $has_editable_entry = true;
+                    break;
+                  }
+                }
+              }
+              ?>
+              <?php if (!empty($entries)) : ?>
+                <div class="gachasoku-draw-admin__chance">
+                  <h3>応募者リスト / チャンスアップ</h3>
+                  <p class="description">倍率を設定すると抽選時の当選確率が上がります（1〜10）。当選・落選済みの応募は変更できません。</p>
+                  <div class="gachasoku-draw-admin__chance-table-wrapper">
+                    <table class="gachasoku-draw-admin__chance-table">
+                      <thead>
+                        <tr>
+                          <th>会員</th>
+                          <th>ステータス</th>
+                          <th>倍率</th>
+                          <th>応募日時</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <?php foreach ($entries as $entry) :
+                          $label = gachasoku_translate_entry_status($entry['status']);
+                          $display_name = $entry['name'] ? $entry['name'] : $entry['email'];
+                          $weight_value = max(1, intval($entry['chance_weight']));
+                          $input_name = 'chance_weight[' . intval($entry['user_id']) . ']';
+                          $is_editable = ($entry['status'] === 'applied');
+                          ?>
+                          <tr class="<?php echo $is_editable ? '' : 'is-disabled'; ?>">
+                            <td>
+                              <?php echo esc_html($display_name); ?>
+                              <?php if ($entry['email'] && $entry['name']) : ?>
+                                <br /><small><?php echo esc_html($entry['email']); ?></small>
+                              <?php endif; ?>
+                            </td>
+                            <td><?php echo esc_html($label); ?></td>
+                            <td>
+                              <?php if ($is_editable) : ?>
+                                <input type="number" name="<?php echo esc_attr($input_name); ?>" min="1" max="10" value="<?php echo esc_attr($weight_value); ?>" />
+                              <?php else : ?>
+                                <span class="gachasoku-draw-admin__chance-value"><?php echo esc_html($weight_value); ?></span>
+                              <?php endif; ?>
+                            </td>
+                            <td><?php echo esc_html(gachasoku_format_datetime($entry['applied_at'])); ?></td>
+                          </tr>
+                        <?php endforeach; ?>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              <?php else : ?>
+                <p class="gachasoku-draw-admin__empty">応募者がまだいません。</p>
+              <?php endif; ?>
               <div class="gachasoku-draw-admin__actions">
+                <?php if ($has_editable_entry) : ?>
+                  <button type="submit" name="gachasoku_draw_action" value="update_chance" class="button">チャンスアップを保存</button>
+                <?php endif; ?>
                 <button type="submit" name="gachasoku_draw_action" value="run" class="button button-primary" <?php disabled($entries_waiting === 0); ?>>抽選を実行</button>
                 <button type="submit" name="gachasoku_draw_action" value="reset" class="button">応募状況をリセット</button>
               </div>
@@ -2378,6 +2535,17 @@ function gachasoku_handle_draw_action() {
   if ($action === 'reset') {
     gachasoku_reset_campaign_entries($campaign_id);
     add_settings_error('gachasoku_draw_admin', 'reset_done', '応募状況をリセットしました。', 'updated');
+    return;
+  }
+
+  if ($action === 'update_chance') {
+    $weights = isset($_POST['chance_weight']) && is_array($_POST['chance_weight']) ? $_POST['chance_weight'] : [];
+    $updated = gachasoku_update_campaign_chance_weights($campaign_id, $weights);
+    if ($updated > 0) {
+      add_settings_error('gachasoku_draw_admin', 'chance_updated', 'チャンスアップ設定を保存しました。', 'updated');
+    } else {
+      add_settings_error('gachasoku_draw_admin', 'chance_none', '変更はありませんでした。', 'updated');
+    }
     return;
   }
 
