@@ -1789,7 +1789,7 @@ footer p {
   }
 
   .ranking-slider__viewport {
-    padding: 0;
+    padding: 0 4px;
   }
 
   .ranking-slider__nav {
@@ -1799,14 +1799,14 @@ footer p {
   .ranking-list {
     padding: 12px 0 20px;
     gap: 12px;
-    display: grid;
-    grid-auto-rows: auto;
-    overflow: visible;
-    scroll-snap-type: none;
+    display: flex;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scroll-padding: 12px;
   }
 
   .ranking-list__item {
-    display: block;
+    flex: 0 0 calc(100% - 24px);
   }
 
   .oripa-index .section {
