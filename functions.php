@@ -1671,18 +1671,21 @@ function gachasoku_render_calendar($year, $month) {
 
   ob_start();
   ?>
-  <div class="gachasoku-calendar">
+  <div class="gachasoku-calendar" data-calendar>
     <header class="gachasoku-calendar__header">
       <h2 class="gachasoku-calendar__title"><?php echo esc_html($month_label); ?></h2>
     </header>
-    <div class="gachasoku-calendar__table">
+    <div class="gachasoku-calendar__table" data-calendar-table>
       <div class="gachasoku-calendar__row gachasoku-calendar__row--head">
         <?php foreach ($weekday_labels as $label) : ?>
           <div class="gachasoku-calendar__cell gachasoku-calendar__cell--head" aria-hidden="true"><?php echo esc_html($label); ?></div>
         <?php endforeach; ?>
       </div>
-      <?php foreach ($weeks as $week_days) : ?>
-        <div class="gachasoku-calendar__row">
+      <?php $week_index = 0; ?>
+      <?php foreach ($weeks as $week_days) :
+        $week_index++;
+        ?>
+        <div class="gachasoku-calendar__row" data-calendar-week="<?php echo esc_attr($week_index); ?>">
           <?php foreach ($week_days as $weekday_index => $day) :
             $weekday_label = isset($weekday_labels[$weekday_index]) ? $weekday_labels[$weekday_index] : '';
             ?>
@@ -1729,6 +1732,9 @@ function gachasoku_render_calendar($year, $month) {
         </div>
       <?php endforeach; ?>
     </div>
+    <?php if ($week_index > 1) : ?>
+      <button type="button" class="gachasoku-calendar__more" data-calendar-more hidden>もっと見る</button>
+    <?php endif; ?>
     <?php $pickup_events = gachasoku_get_calendar_pickup_events(); ?>
     <?php if (!empty($pickup_events)) :
       $pickup = $pickup_events[0];

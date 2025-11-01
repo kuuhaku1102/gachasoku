@@ -110,3 +110,76 @@
     updateNavState();
   });
 })();
+
+(function() {
+  const calendars = document.querySelectorAll('[data-calendar]');
+
+  if (!calendars.length) {
+    return;
+  }
+
+  calendars.forEach((calendar) => {
+    const weeks = calendar.querySelectorAll('[data-calendar-week]');
+    const trigger = calendar.querySelector('[data-calendar-more]');
+
+    if (!trigger || weeks.length <= 1) {
+      return;
+    }
+
+    let isExpanded = false;
+
+    const setCollapsedState = () => {
+      calendar.classList.add('gachasoku-calendar--collapsed');
+      calendar.classList.remove('gachasoku-calendar--expanded');
+
+      weeks.forEach((week, index) => {
+        week.hidden = index > 0;
+      });
+
+      trigger.hidden = false;
+      trigger.setAttribute('aria-expanded', 'false');
+    };
+
+    const setExpandedState = () => {
+      calendar.classList.remove('gachasoku-calendar--collapsed');
+      calendar.classList.add('gachasoku-calendar--expanded');
+
+      weeks.forEach((week) => {
+        week.hidden = false;
+      });
+
+      trigger.hidden = true;
+      trigger.setAttribute('aria-expanded', 'true');
+    };
+
+    const mq = window.matchMedia('(max-width: 600px)');
+
+    const syncState = () => {
+      if (mq.matches) {
+        if (isExpanded) {
+          setExpandedState();
+        } else {
+          setCollapsedState();
+        }
+      } else {
+        isExpanded = false;
+        setExpandedState();
+      }
+    };
+
+    const handleTriggerClick = () => {
+      isExpanded = true;
+      setExpandedState();
+    };
+
+    trigger.addEventListener('click', handleTriggerClick);
+
+    if (typeof mq.addEventListener === 'function') {
+      mq.addEventListener('change', syncState);
+    } else if (typeof mq.addListener === 'function') {
+      mq.addListener(syncState);
+    }
+
+    syncState();
+  });
+})();
