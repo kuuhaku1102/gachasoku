@@ -1678,19 +1678,22 @@ function gachasoku_render_calendar($year, $month) {
     <div class="gachasoku-calendar__table">
       <div class="gachasoku-calendar__row gachasoku-calendar__row--head">
         <?php foreach ($weekday_labels as $label) : ?>
-          <div class="gachasoku-calendar__cell gachasoku-calendar__cell--head"><?php echo esc_html($label); ?></div>
+          <div class="gachasoku-calendar__cell gachasoku-calendar__cell--head" aria-hidden="true"><?php echo esc_html($label); ?></div>
         <?php endforeach; ?>
       </div>
       <?php foreach ($weeks as $week_days) : ?>
         <div class="gachasoku-calendar__row">
-          <?php foreach ($week_days as $day) : ?>
+          <?php foreach ($week_days as $weekday_index => $day) :
+            $weekday_label = isset($weekday_labels[$weekday_index]) ? $weekday_labels[$weekday_index] : '';
+            ?>
             <?php if ($day === null) : ?>
-              <div class="gachasoku-calendar__cell gachasoku-calendar__cell--empty"></div>
+              <div class="gachasoku-calendar__cell gachasoku-calendar__cell--empty" aria-hidden="true"></div>
             <?php else :
               $events = isset($events_by_day[$day]) ? $events_by_day[$day] : [];
               $has_events = !empty($events);
+              $weekday_attr = $weekday_label !== '' ? sprintf(' data-weekday="%s"', esc_attr($weekday_label)) : '';
               ?>
-              <div class="gachasoku-calendar__cell <?php echo $has_events ? 'gachasoku-calendar__cell--has-events' : ''; ?>">
+              <div class="gachasoku-calendar__cell <?php echo $has_events ? 'gachasoku-calendar__cell--has-events' : ''; ?>"<?php echo $weekday_attr; ?>>
                 <div class="gachasoku-calendar__day"><?php echo esc_html($day); ?></div>
                 <?php if ($has_events) : ?>
                   <ul class="gachasoku-calendar__events">

@@ -735,7 +735,7 @@ footer p {
 
 .ranking-card__actions {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
   gap: 10px;
   width: 100%;
 }
@@ -751,6 +751,8 @@ footer p {
   transition: var(--transition);
   box-shadow: 0 6px 16px rgba(15, 23, 42, 0.12);
   width: 100%;
+  white-space: normal;
+  text-align: center;
 }
 
 .ranking-card__button--detail {
@@ -1179,51 +1181,82 @@ footer p {
     padding: 16px;
   }
 
+  .gachasoku-calendar__header {
+    text-align: left;
+  }
+
+  .gachasoku-calendar__table {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 12px;
+    overflow: visible;
+  }
+
   .gachasoku-calendar__row {
-    gap: 6px;
-    grid-template-columns: repeat(7, minmax(120px, 1fr));
+    display: contents;
+  }
+
+  .gachasoku-calendar__row--head {
+    display: none;
   }
 
   .gachasoku-calendar__cell {
-    min-height: 95px;
-    padding: 10px;
+    min-height: 0;
+    padding: 14px 16px;
+  }
+
+  .gachasoku-calendar__cell--empty {
+    display: none;
+  }
+
+  .gachasoku-calendar__cell[data-weekday]::before {
+    content: attr(data-weekday);
+    display: block;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: #64748b;
+    margin-bottom: 4px;
   }
 
   .gachasoku-calendar__day {
-    font-size: 16px;
+    font-size: 1.2rem;
   }
 
   .gachasoku-calendar__events {
-    gap: 4px;
+    gap: 6px;
   }
 
   .gachasoku-calendar__event {
-    font-size: 13px;
-    padding: 6px 8px;
+    font-size: 0.85rem;
+    padding: 8px 10px;
   }
 
   .gachasoku-calendar__event-time,
   .gachasoku-calendar__event-notes p {
-    font-size: 12px;
+    font-size: 0.78rem;
   }
 }
 
 @media (max-width: 540px) {
-  .gachasoku-calendar__table {
-    gap: 6px;
-  }
-
-  .gachasoku-calendar__row {
-    grid-template-columns: repeat(7, minmax(105px, 1fr));
+  .gachasoku-calendar {
+    padding: 14px;
   }
 
   .gachasoku-calendar__cell {
-    min-height: 88px;
-    padding: 9px;
+    padding: 12px 14px;
+  }
+
+  .gachasoku-calendar__day {
+    font-size: 1.05rem;
   }
 
   .gachasoku-calendar__event {
-    font-size: 12px;
+    font-size: 0.8rem;
+  }
+
+  .gachasoku-calendar__event-time,
+  .gachasoku-calendar__event-notes p {
+    font-size: 0.75rem;
   }
 }
 
