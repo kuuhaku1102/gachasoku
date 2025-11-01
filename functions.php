@@ -162,9 +162,13 @@ function gachasoku_render_ranking_list($entries = null, $args = []) {
       $has_detail = $detail_label && $detail_url;
       $has_official = $official_label && $official_url;
       $has_actions = $has_detail || $has_official;
+      $has_body = $content || $has_actions;
       $card_classes = ['ranking-card'];
       if ($position) {
         $card_classes[] = 'ranking-card--has-badge';
+      }
+      if (!$image_url) {
+        $card_classes[] = 'ranking-card--no-image';
       }
       ?>
         <li class="<?php echo esc_attr($args['item_class']); ?>">
@@ -183,20 +187,24 @@ function gachasoku_render_ranking_list($entries = null, $args = []) {
                 <?php endif; ?>
               </div>
             <?php endif; ?>
-            <?php if ($content) : ?>
-              <div class="ranking-card__content"><?php echo wpautop(wp_kses_post($content)); ?></div>
-            <?php endif; ?>
-            <?php if ($has_actions) : ?>
-              <div class="ranking-card__actions">
-                <?php if ($has_detail) : ?>
-                  <a class="ranking-card__button ranking-card__button--detail" href="<?php echo esc_url($detail_url); ?>" target="_blank" rel="noopener noreferrer">
-                    <?php echo esc_html($detail_label); ?>
-                  </a>
+            <?php if ($has_body) : ?>
+              <div class="ranking-card__body">
+                <?php if ($content) : ?>
+                  <div class="ranking-card__content"><?php echo wpautop(wp_kses_post($content)); ?></div>
                 <?php endif; ?>
-                <?php if ($has_official) : ?>
-                  <a class="ranking-card__button ranking-card__button--official" href="<?php echo esc_url($official_url); ?>" target="_blank" rel="noopener noreferrer">
-                    <?php echo esc_html($official_label); ?>
-                  </a>
+                <?php if ($has_actions) : ?>
+                  <div class="ranking-card__actions">
+                    <?php if ($has_detail) : ?>
+                      <a class="ranking-card__button ranking-card__button--detail" href="<?php echo esc_url($detail_url); ?>" target="_blank" rel="noopener noreferrer">
+                        <?php echo esc_html($detail_label); ?>
+                      </a>
+                    <?php endif; ?>
+                    <?php if ($has_official) : ?>
+                      <a class="ranking-card__button ranking-card__button--official" href="<?php echo esc_url($official_url); ?>" target="_blank" rel="noopener noreferrer">
+                        <?php echo esc_html($official_label); ?>
+                      </a>
+                    <?php endif; ?>
+                  </div>
                 <?php endif; ?>
               </div>
             <?php endif; ?>
