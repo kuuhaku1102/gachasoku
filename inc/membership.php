@@ -14,7 +14,7 @@ if (!defined('GACHASOKU_MEMBER_STATUS_WITHDRAWN')) {
 }
 
 if (!defined('GACHASOKU_MEMBERSHIP_DB_VERSION')) {
-  define('GACHASOKU_MEMBERSHIP_DB_VERSION', '2.2.0');
+  define('GACHASOKU_MEMBERSHIP_DB_VERSION', '2.3.0');
 }
 
 if (!defined('GACHASOKU_MEMBERSHIP_PAGES_VERSION')) {
@@ -33,6 +33,11 @@ function gachasoku_get_members_table() {
 function gachasoku_get_member_sessions_table() {
   global $wpdb;
   return $wpdb->prefix . 'gachasoku_member_sessions';
+}
+
+function gachasoku_get_hit_posts_table() {
+  global $wpdb;
+  return $wpdb->prefix . 'gachasoku_hit_posts';
 }
 
 function gachasoku_get_member_status_options() {
@@ -610,6 +615,7 @@ function gachasoku_install_membership_tables() {
   $entries_table = $wpdb->prefix . 'gachasoku_campaign_entries';
   $logs_table = $wpdb->prefix . 'gachasoku_campaign_draw_logs';
   $votes_table = $wpdb->prefix . 'gachasoku_ranking_votes';
+  $hits_table = gachasoku_get_hit_posts_table();
 
   $members_sql = "CREATE TABLE {$members_table} (
     id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
@@ -677,11 +683,27 @@ function gachasoku_install_membership_tables() {
     KEY created_at (created_at)
   ) {$charset_collate};";
 
+  $hits_sql = "CREATE TABLE {$hits_table} (
+    id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+    member_id bigint(20) unsigned NOT NULL,
+    entry_id varchar(191) NOT NULL,
+    content text NOT NULL,
+    status varchar(20) NOT NULL DEFAULT 'published',
+    created_at datetime NOT NULL,
+    updated_at datetime NOT NULL,
+    PRIMARY KEY  (id),
+    KEY member_id (member_id),
+    KEY status (status),
+    KEY entry_id (entry_id(64)),
+    UNIQUE KEY member_entry (member_id, entry_id(64))
+  ) {$charset_collate};";
+
   dbDelta($members_sql);
   dbDelta($sessions_sql);
   dbDelta($entries_sql);
   dbDelta($logs_sql);
   dbDelta($votes_sql);
+  dbDelta($hits_sql);
 
   gachasoku_migrate_existing_wp_members();
 
@@ -1014,6 +1036,10 @@ function gachasoku_handle_membership_requests() {
   if (!empty($_POST['gachasoku_campaign_apply'])) {
     gachasoku_handle_campaign_application();
   }
+
+  if (!empty($_POST['gachasoku_hit_post_submit'])) {
+    gachasoku_handle_hit_post_submission();
+  }
 }
 
 function gachasoku_handle_registration() {
@@ -1238,6 +1264,58 @@ function gachasoku_handle_campaign_application() {
   }
 
   gachasoku_add_membership_message('campaign', 'success', 'キャンペーンに応募しました。結果発表をお待ちください。');
+}
+
+function gachasoku_handle_hit_post_submission() {
+  if (!gachasoku_is_member_logged_in()) {
+    gachasoku_add_membership_message('dashboard', 'error', '投稿にはログインが必要です。');
+    return;
+  }
+
+  $nonce = isset($_POST['gachasoku_hit_post_nonce']) ? $_POST['gachasoku_hit_post_nonce'] : '';
+  if (!wp_verify_nonce($nonce, 'gachasoku_hit_post')) {
+    gachasoku_add_membership_message('dashboard', 'error', 'フォームの有効期限が切れました。再度お試しください。');
+    return;
+  }
+
+  $member_id = gachasoku_get_current_member_id();
+  if (!$member_id) {
+    gachasoku_add_membership_message('dashboard', 'error', '会員情報を取得できませんでした。');
+    return;
+  }
+
+  $status = gachasoku_get_member_status($member_id);
+  if ($status !== GACHASOKU_MEMBER_STATUS_ACTIVE) {
+    gachasoku_add_membership_message('dashboard', 'error', '現在のステータスでは投稿できません。');
+    return;
+  }
+
+  $entry_id = isset($_POST['gachasoku_hit_post_entry']) ? sanitize_key($_POST['gachasoku_hit_post_entry']) : '';
+  if ($entry_id === '') {
+    gachasoku_add_membership_message('dashboard', 'error', 'サイトを選択してください。');
+    return;
+  }
+
+  $entry = function_exists('gachasoku_find_ranking_entry') ? gachasoku_find_ranking_entry($entry_id) : null;
+  if (!$entry) {
+    gachasoku_add_membership_message('dashboard', 'error', '選択したサイトは見つかりませんでした。');
+    return;
+  }
+
+  $content_raw = isset($_POST['gachasoku_hit_post_content']) ? wp_unslash($_POST['gachasoku_hit_post_content']) : '';
+  $content = sanitize_textarea_field($content_raw);
+  if ($content === '') {
+    gachasoku_add_membership_message('dashboard', 'error', '当たりカードの内容を入力してください。');
+    return;
+  }
+
+  $result = gachasoku_save_member_hit_post($member_id, $entry_id, $content);
+  if (is_wp_error($result)) {
+    gachasoku_add_membership_message('dashboard', 'error', $result->get_error_message());
+    return;
+  }
+
+  gachasoku_add_membership_message('dashboard', 'success', '投稿内容を保存しました。');
 }
 
 function gachasoku_register_campaign_entry($campaign_id, $user_id) {
@@ -1822,6 +1900,10 @@ function gachasoku_member_dashboard_shortcode() {
     ? gachasoku_get_sorted_ranking_entries($member['id'])
     : [];
   $can_vote = ($status === GACHASOKU_MEMBER_STATUS_ACTIVE);
+  $hit_posts = gachasoku_get_member_hit_posts($member['id'], [
+    'orderby' => 'updated_at',
+    'order'   => 'DESC',
+  ]);
   $grouped = gachasoku_get_campaign_entries_grouped($member['id']);
   $open_campaigns = gachasoku_get_open_campaign_items($member['id']);
 
@@ -1863,6 +1945,12 @@ function gachasoku_member_dashboard_shortcode() {
       <h2 class="gachasoku-dashboard__title">ランキング投票状況</h2>
       <?php echo gachasoku_render_member_ranking_summary($member['id'], $ranking_entries); ?>
       <?php echo gachasoku_render_member_ranking_vote_form($member['id'], $ranking_entries, $can_vote); ?>
+    </section>
+
+    <section class="gachasoku-dashboard__section">
+      <h2 class="gachasoku-dashboard__title">みんなの当たり広場</h2>
+      <?php echo gachasoku_render_member_hit_post_form($member['id'], $ranking_entries, $can_vote); ?>
+      <?php echo gachasoku_render_member_hit_post_list($hit_posts); ?>
     </section>
 
     <section class="gachasoku-dashboard__section">
@@ -2085,6 +2173,116 @@ function gachasoku_render_member_ranking_vote_form($member_id, $entries = null, 
   return ob_get_clean();
 }
 
+function gachasoku_render_member_hit_post_form($member_id, $entries = null, $can_post = true) {
+  if (!$can_post) {
+    return '<p class="gachasoku-dashboard__hits-disabled">現在のステータスでは投稿できません。</p>';
+  }
+
+  if (!function_exists('gachasoku_get_sorted_ranking_entries')) {
+    return '';
+  }
+
+  if ($entries === null) {
+    $entries = gachasoku_get_sorted_ranking_entries($member_id);
+  }
+
+  if (empty($entries)) {
+    return '<p class="gachasoku-dashboard__empty">現在投稿できるランキングはありません。</p>';
+  }
+
+  $options = [];
+  foreach ($entries as $entry) {
+    if (!is_array($entry)) {
+      continue;
+    }
+
+    $entry_id = isset($entry['id']) ? sanitize_key($entry['id']) : '';
+    if ($entry_id === '') {
+      continue;
+    }
+
+    $label = function_exists('gachasoku_get_ranking_entry_display_name')
+      ? gachasoku_get_ranking_entry_display_name($entry)
+      : '';
+
+    if ($label === '' && !empty($entry['name'])) {
+      $label = $entry['name'];
+    }
+    if ($label === '' && !empty($entry['position'])) {
+      $label = $entry['position'];
+    }
+
+    if ($label === '') {
+      $label = $entry_id;
+    }
+
+    $options[] = [
+      'id'    => $entry_id,
+      'label' => $label,
+    ];
+  }
+
+  if (empty($options)) {
+    return '<p class="gachasoku-dashboard__empty">現在投稿できるランキングはありません。</p>';
+  }
+
+  ob_start();
+  ?>
+  <form method="post" class="gachasoku-form gachasoku-dashboard__form gachasoku-dashboard__hit-form" data-hit-form>
+    <?php wp_nonce_field('gachasoku_hit_post', 'gachasoku_hit_post_nonce'); ?>
+    <div class="gachasoku-form__field">
+      <label for="gachasoku_hit_post_entry">サイト</label>
+      <select name="gachasoku_hit_post_entry" id="gachasoku_hit_post_entry" data-hit-entry required>
+        <option value="">選択してください</option>
+        <?php foreach ($options as $option) : ?>
+          <option value="<?php echo esc_attr($option['id']); ?>"><?php echo esc_html($option['label']); ?></option>
+        <?php endforeach; ?>
+      </select>
+    </div>
+    <div class="gachasoku-form__field">
+      <label for="gachasoku_hit_post_content">当たりカード</label>
+      <textarea name="gachasoku_hit_post_content" id="gachasoku_hit_post_content" rows="4" data-hit-content placeholder="例：○○円ガチャでピカチュウSRが当たりました！" required></textarea>
+    </div>
+    <div class="gachasoku-form__actions">
+      <button type="submit" class="gachasoku-button">投稿を保存</button>
+    </div>
+    <input type="hidden" name="gachasoku_hit_post_submit" value="1" />
+  </form>
+  <p class="gachasoku-dashboard__hits-note">選択したサイトごとに最新の当たり報告を投稿・更新できます。</p>
+  <?php
+  return ob_get_clean();
+}
+
+function gachasoku_render_member_hit_post_list($posts) {
+  if (empty($posts)) {
+    return '<p class="gachasoku-dashboard__empty gachasoku-dashboard__hits-empty">まだ投稿がありません。</p>';
+  }
+
+  ob_start();
+  ?>
+  <ul class="gachasoku-dashboard__hits-list">
+    <?php foreach ($posts as $post) :
+      $content_html = gachasoku_format_hit_post_content(isset($post['content']) ? $post['content'] : '');
+      $datetime_attr = !empty($post['updated_at']) ? mysql2date('c', $post['updated_at']) : '';
+      $display_time = !empty($post['updated_at']) ? gachasoku_format_datetime($post['updated_at']) : '';
+      ?>
+      <li class="gachasoku-dashboard__hits-item">
+        <div class="gachasoku-dashboard__hits-head">
+          <span class="gachasoku-dashboard__hits-site"><?php echo esc_html($post['entry_label']); ?></span>
+          <?php if ($display_time && $datetime_attr) : ?>
+            <time class="gachasoku-dashboard__hits-time" datetime="<?php echo esc_attr($datetime_attr); ?>"><?php echo esc_html($display_time); ?></time>
+          <?php endif; ?>
+        </div>
+        <div class="gachasoku-dashboard__hits-body">
+          <?php echo $content_html !== '' ? $content_html : '<p>—</p>'; ?>
+        </div>
+      </li>
+    <?php endforeach; ?>
+  </ul>
+  <?php
+  return ob_get_clean();
+}
+
 function gachasoku_format_datetime($datetime) {
   if (!$datetime) {
     return '';
@@ -2107,6 +2305,309 @@ function gachasoku_translate_entry_status($status) {
     default:
       return $status;
   }
+}
+
+function gachasoku_format_hit_post_content($content) {
+  $content = trim((string) $content);
+  if ($content === '') {
+    return '';
+  }
+
+  return wpautop(esc_html($content));
+}
+
+function gachasoku_get_hit_post_entry_labels() {
+  if (!function_exists('gachasoku_get_ranking_entries')) {
+    return [];
+  }
+
+  $entries = gachasoku_get_ranking_entries();
+  if (empty($entries)) {
+    return [];
+  }
+
+  $labels = [];
+  foreach ($entries as $entry) {
+    if (!is_array($entry)) {
+      continue;
+    }
+
+    $entry_id = isset($entry['id']) ? sanitize_key($entry['id']) : '';
+    if ($entry_id === '') {
+      continue;
+    }
+
+    $label = function_exists('gachasoku_get_ranking_entry_display_name')
+      ? gachasoku_get_ranking_entry_display_name($entry)
+      : '';
+
+    if ($label === '' && !empty($entry['name'])) {
+      $label = sanitize_text_field($entry['name']);
+    }
+
+    if ($label === '' && !empty($entry['position'])) {
+      $label = sanitize_text_field($entry['position']);
+    }
+
+    $labels[$entry_id] = $label !== '' ? $label : $entry_id;
+  }
+
+  return $labels;
+}
+
+function gachasoku_attach_hit_post_labels($posts) {
+  if (empty($posts) || !is_array($posts)) {
+    return [];
+  }
+
+  $labels = gachasoku_get_hit_post_entry_labels();
+
+  foreach ($posts as &$post) {
+    $entry_id = isset($post['entry_id']) ? sanitize_key($post['entry_id']) : '';
+    $post['entry_id'] = $entry_id;
+    $post['entry_label'] = isset($labels[$entry_id]) ? $labels[$entry_id] : $entry_id;
+  }
+  unset($post);
+
+  return $posts;
+}
+
+function gachasoku_get_hit_posts($args = []) {
+  global $wpdb;
+
+  $defaults = [
+    'status'    => 'published',
+    'entry_id'  => '',
+    'entry_ids' => [],
+    'member_id' => 0,
+    'orderby'   => 'updated_at',
+    'order'     => 'DESC',
+    'limit'     => 0,
+  ];
+
+  $args = wp_parse_args($args, $defaults);
+
+  $table = gachasoku_get_hit_posts_table();
+  $members_table = gachasoku_get_members_table();
+
+  $where = [];
+  $params = [];
+
+  if ($args['status'] !== '' && $args['status'] !== null) {
+    $where[] = 'p.status = %s';
+    $params[] = sanitize_key($args['status']);
+  }
+
+  $member_id = intval($args['member_id']);
+  if ($member_id > 0) {
+    $where[] = 'p.member_id = %d';
+    $params[] = $member_id;
+  }
+
+  $entry_ids = [];
+  if (!empty($args['entry_id'])) {
+    $entry_ids[] = sanitize_key($args['entry_id']);
+  }
+  if (!empty($args['entry_ids']) && is_array($args['entry_ids'])) {
+    foreach ($args['entry_ids'] as $entry_id) {
+      $entry_ids[] = sanitize_key($entry_id);
+    }
+  }
+  $entry_ids = array_values(array_filter(array_unique($entry_ids)));
+  if (!empty($entry_ids)) {
+    $placeholders = implode(',', array_fill(0, count($entry_ids), '%s'));
+    $where[] = 'p.entry_id IN (' . $placeholders . ')';
+    $params = array_merge($params, $entry_ids);
+  }
+
+  $sql = "SELECT p.*, m.name AS member_name FROM {$table} p LEFT JOIN {$members_table} m ON p.member_id = m.id";
+  if ($where) {
+    $sql .= ' WHERE ' . implode(' AND ', $where);
+  }
+
+  $allowed_orderby = ['updated_at', 'created_at', 'id'];
+  $orderby = in_array($args['orderby'], $allowed_orderby, true) ? $args['orderby'] : 'updated_at';
+  $order = strtoupper($args['order']) === 'ASC' ? 'ASC' : 'DESC';
+  $sql .= " ORDER BY p.{$orderby} {$order}";
+
+  $limit = intval($args['limit']);
+  if ($limit > 0) {
+    $sql .= $wpdb->prepare(' LIMIT %d', $limit);
+  }
+
+  $query = $params ? $wpdb->prepare($sql, $params) : $sql;
+  $results = $wpdb->get_results($query, ARRAY_A);
+
+  if (empty($results)) {
+    return [];
+  }
+
+  return $results;
+}
+
+function gachasoku_get_recent_hit_posts($args = []) {
+  $args = wp_parse_args($args, [
+    'limit'  => 5,
+    'status' => 'published',
+  ]);
+
+  $posts = gachasoku_get_hit_posts($args);
+  return gachasoku_attach_hit_post_labels($posts);
+}
+
+function gachasoku_get_member_hit_posts($member_id, $args = []) {
+  $member_id = intval($member_id);
+  if ($member_id <= 0) {
+    return [];
+  }
+
+  $args = wp_parse_args($args, []);
+  $args['member_id'] = $member_id;
+  if (!array_key_exists('status', $args)) {
+    $args['status'] = 'published';
+  }
+
+  $posts = gachasoku_get_hit_posts($args);
+  return gachasoku_attach_hit_post_labels($posts);
+}
+
+function gachasoku_get_member_hit_posts_map($member_id) {
+  $member_id = intval($member_id);
+  if ($member_id <= 0) {
+    return [];
+  }
+
+  $posts = gachasoku_get_hit_posts([
+    'member_id' => $member_id,
+    'status'    => '',
+    'orderby'   => 'updated_at',
+    'order'     => 'DESC',
+  ]);
+
+  if (empty($posts)) {
+    return [];
+  }
+
+  $map = [];
+  foreach ($posts as $post) {
+    $entry_id = isset($post['entry_id']) ? sanitize_key($post['entry_id']) : '';
+    if ($entry_id === '') {
+      continue;
+    }
+
+    $map[$entry_id] = [
+      'content'    => isset($post['content']) ? (string) $post['content'] : '',
+      'status'     => isset($post['status']) ? (string) $post['status'] : '',
+      'updated_at' => isset($post['updated_at']) ? (string) $post['updated_at'] : '',
+    ];
+  }
+
+  return $map;
+}
+
+function gachasoku_save_member_hit_post($member_id, $entry_id, $content) {
+  global $wpdb;
+
+  $member_id = intval($member_id);
+  $entry_id = sanitize_key($entry_id);
+  $content = sanitize_textarea_field($content);
+
+  if ($member_id <= 0 || $entry_id === '' || $content === '') {
+    return new WP_Error('invalid_post', '投稿情報が不正です。');
+  }
+
+  $table = gachasoku_get_hit_posts_table();
+  $now = current_time('mysql');
+
+  $existing_id = $wpdb->get_var($wpdb->prepare(
+    "SELECT id FROM {$table} WHERE member_id = %d AND entry_id = %s",
+    $member_id,
+    $entry_id
+  ));
+
+  if ($existing_id) {
+    $updated = $wpdb->update(
+      $table,
+      [
+        'content'    => $content,
+        'status'     => 'published',
+        'updated_at' => $now,
+      ],
+      [
+        'id' => intval($existing_id),
+      ],
+      ['%s', '%s', '%s'],
+      ['%d']
+    );
+
+    if ($updated === false) {
+      return new WP_Error('db_error', '投稿を更新できませんでした。');
+    }
+
+    return intval($existing_id);
+  }
+
+  $inserted = $wpdb->insert(
+    $table,
+    [
+      'member_id'  => $member_id,
+      'entry_id'   => $entry_id,
+      'content'    => $content,
+      'status'     => 'published',
+      'created_at' => $now,
+      'updated_at' => $now,
+    ],
+    ['%d', '%s', '%s', '%s', '%s', '%s']
+  );
+
+  if ($inserted === false) {
+    return new WP_Error('db_error', '投稿を保存できませんでした。');
+  }
+
+  return intval($wpdb->insert_id);
+}
+
+function gachasoku_delete_hit_post($post_id) {
+  global $wpdb;
+
+  $post_id = intval($post_id);
+  if ($post_id <= 0) {
+    return false;
+  }
+
+  $table = gachasoku_get_hit_posts_table();
+  $deleted = $wpdb->delete($table, ['id' => $post_id], ['%d']);
+
+  return $deleted !== false;
+}
+
+function gachasoku_resolve_hit_post_entry_ids($value) {
+  $value = trim((string) $value);
+  if ($value === '') {
+    return [];
+  }
+
+  $labels = gachasoku_get_hit_post_entry_labels();
+  if (empty($labels)) {
+    return [];
+  }
+
+  $matches = [];
+  $value_key = sanitize_key($value);
+  if ($value_key !== '' && isset($labels[$value_key])) {
+    $matches[] = $value_key;
+  }
+
+  $value_slug = sanitize_title($value);
+  if ($value_slug !== '') {
+    foreach ($labels as $entry_id => $label) {
+      if (sanitize_title($label) === $value_slug) {
+        $matches[] = $entry_id;
+      }
+    }
+  }
+
+  return array_values(array_unique(array_filter($matches)));
 }
 
 add_shortcode('gachasoku_campaigns', 'gachasoku_campaigns_shortcode');
@@ -2163,6 +2664,60 @@ function gachasoku_campaigns_shortcode($atts = []) {
   echo gachasoku_render_membership_messages('campaign');
   echo $output;
 
+  return ob_get_clean();
+}
+
+add_shortcode('gachasoku_hit_posts', 'gachasoku_hit_posts_shortcode');
+function gachasoku_hit_posts_shortcode($atts = []) {
+  $atts = shortcode_atts([
+    'site'          => '',
+    'limit'         => 5,
+    'empty_message' => '投稿はまだありません。',
+  ], $atts, 'gachasoku_hit_posts');
+
+  $args = [
+    'limit'  => max(0, intval($atts['limit'])),
+    'status' => 'published',
+  ];
+
+  $site_filter = trim((string) $atts['site']);
+  if ($site_filter !== '') {
+    $entry_ids = gachasoku_resolve_hit_post_entry_ids($site_filter);
+    if (empty($entry_ids)) {
+      return '<p class="gachasoku-hit-posts__empty">' . esc_html($atts['empty_message']) . '</p>';
+    }
+    $args['entry_ids'] = $entry_ids;
+  }
+
+  $posts = gachasoku_get_recent_hit_posts($args);
+  if (empty($posts)) {
+    return '<p class="gachasoku-hit-posts__empty">' . esc_html($atts['empty_message']) . '</p>';
+  }
+
+  ob_start();
+  ?>
+  <div class="gachasoku-hit-posts">
+    <ul class="gachasoku-hit-posts__list">
+      <?php foreach ($posts as $post) :
+        $content_html = gachasoku_format_hit_post_content(isset($post['content']) ? $post['content'] : '');
+        $datetime_attr = !empty($post['updated_at']) ? mysql2date('c', $post['updated_at']) : '';
+        $display_time = !empty($post['updated_at']) ? gachasoku_format_datetime($post['updated_at']) : '';
+        ?>
+        <li class="gachasoku-hit-posts__item">
+          <div class="gachasoku-hit-posts__head">
+            <span class="gachasoku-hit-posts__site"><?php echo esc_html($post['entry_label']); ?></span>
+            <?php if ($display_time && $datetime_attr) : ?>
+              <time class="gachasoku-hit-posts__time" datetime="<?php echo esc_attr($datetime_attr); ?>"><?php echo esc_html($display_time); ?></time>
+            <?php endif; ?>
+          </div>
+          <div class="gachasoku-hit-posts__body">
+            <?php echo $content_html; ?>
+          </div>
+        </li>
+      <?php endforeach; ?>
+    </ul>
+  </div>
+  <?php
   return ob_get_clean();
 }
 
@@ -2290,11 +2845,20 @@ function gachasoku_register_membership_admin_pages() {
     'gachasoku-draws',
     'gachasoku_render_draw_admin_page'
   );
+
+  add_submenu_page(
+    'gachasoku-members',
+    '当たり広場',
+    '当たり広場',
+    'manage_options',
+    'gachasoku-hits',
+    'gachasoku_render_hit_posts_admin_page'
+  );
 }
 
 add_action('admin_enqueue_scripts', 'gachasoku_enqueue_member_admin_assets');
 function gachasoku_enqueue_member_admin_assets($hook) {
-  $screens = ['toplevel_page_gachasoku-members', 'gachasoku-members_page_gachasoku-draws'];
+  $screens = ['toplevel_page_gachasoku-members', 'gachasoku-members_page_gachasoku-draws', 'gachasoku-members_page_gachasoku-hits'];
   if (!in_array($hook, $screens, true)) {
     return;
   }
@@ -2460,6 +3024,132 @@ function gachasoku_handle_member_admin_actions() {
       add_settings_error('gachasoku_member_admin', 'deleted', '会員を削除しました。', 'updated');
     } else {
       add_settings_error('gachasoku_member_admin', 'delete_failed', '会員の削除に失敗しました。', 'error');
+    }
+  }
+}
+
+function gachasoku_render_hit_posts_admin_page() {
+  if (!current_user_can('manage_options')) {
+    return;
+  }
+
+  if (!empty($_POST['gachasoku_hit_admin_action'])) {
+    gachasoku_handle_hit_post_admin_actions();
+  }
+
+  $entry_filter = isset($_GET['entry']) ? sanitize_text_field(wp_unslash($_GET['entry'])) : '';
+  $entry_filter_key = $entry_filter !== '' ? sanitize_key($entry_filter) : '';
+  $status_filter = isset($_GET['status']) ? sanitize_text_field(wp_unslash($_GET['status'])) : 'published';
+
+  $labels = gachasoku_get_hit_post_entry_labels();
+
+  $query_args = [
+    'orderby' => 'updated_at',
+    'order'   => 'DESC',
+    'limit'   => 100,
+  ];
+
+  if ($entry_filter_key !== '') {
+    $query_args['entry_id'] = $entry_filter_key;
+  }
+
+  if ($status_filter === 'all') {
+    $query_args['status'] = '';
+  } else {
+    $query_args['status'] = sanitize_key($status_filter);
+  }
+
+  $posts = gachasoku_get_hit_posts($query_args);
+  $posts = gachasoku_attach_hit_post_labels($posts);
+
+  ?>
+  <div class="wrap gachasoku-hit-admin">
+    <h1>みんなの当たり広場</h1>
+    <form method="get" class="gachasoku-hit-admin__filters">
+      <input type="hidden" name="page" value="gachasoku-hits" />
+      <select name="entry">
+        <option value="">サイトすべて</option>
+        <?php foreach ($labels as $id => $label) : ?>
+          <option value="<?php echo esc_attr($id); ?>" <?php selected($entry_filter_key, $id); ?>><?php echo esc_html($label); ?></option>
+        <?php endforeach; ?>
+      </select>
+      <select name="status">
+        <option value="published" <?php selected($status_filter, 'published'); ?>>公開のみ</option>
+        <option value="all" <?php selected($status_filter, 'all'); ?>>すべての状態</option>
+      </select>
+      <button type="submit" class="button">絞り込み</button>
+    </form>
+
+    <?php settings_errors('gachasoku_hit_admin'); ?>
+
+    <table class="widefat fixed striped gachasoku-hit-admin__table">
+      <thead>
+        <tr>
+          <th>更新日時</th>
+          <th>サイト</th>
+          <th>会員</th>
+          <th>内容</th>
+          <th>操作</th>
+        </tr>
+      </thead>
+      <tbody>
+        <?php if (!empty($posts)) : ?>
+          <?php foreach ($posts as $post) :
+            $display_time = !empty($post['updated_at']) ? gachasoku_format_datetime($post['updated_at']) : '';
+            $content_html = gachasoku_format_hit_post_content(isset($post['content']) ? $post['content'] : '');
+            $member_label = !empty($post['member_name']) ? $post['member_name'] : '—';
+            ?>
+            <tr>
+              <td><?php echo esc_html($display_time); ?></td>
+              <td><?php echo esc_html($post['entry_label']); ?></td>
+              <td>
+                <div class="gachasoku-hit-admin__member">
+                  <span class="gachasoku-hit-admin__member-name"><?php echo esc_html($member_label); ?></span>
+                  <span class="gachasoku-hit-admin__member-id">ID: <?php echo esc_html($post['member_id']); ?></span>
+                </div>
+              </td>
+              <td>
+                <div class="gachasoku-hit-admin__content"><?php echo $content_html !== '' ? $content_html : '<p>—</p>'; ?></div>
+              </td>
+              <td>
+                <form method="post" onsubmit="return confirm('この投稿を削除しますか？');">
+                  <?php wp_nonce_field('gachasoku_hit_delete_' . $post['id'], 'gachasoku_hit_admin_nonce'); ?>
+                  <input type="hidden" name="post_id" value="<?php echo esc_attr($post['id']); ?>" />
+                  <button type="submit" name="gachasoku_hit_admin_action" value="delete" class="button button-secondary">削除</button>
+                </form>
+              </td>
+            </tr>
+          <?php endforeach; ?>
+        <?php else : ?>
+          <tr>
+            <td colspan="5">条件に一致する投稿は見つかりませんでした。</td>
+          </tr>
+        <?php endif; ?>
+      </tbody>
+    </table>
+  </div>
+  <?php
+}
+
+function gachasoku_handle_hit_post_admin_actions() {
+  if (!current_user_can('manage_options')) {
+    return;
+  }
+
+  $action = isset($_POST['gachasoku_hit_admin_action']) ? sanitize_text_field($_POST['gachasoku_hit_admin_action']) : '';
+  $post_id = isset($_POST['post_id']) ? intval($_POST['post_id']) : 0;
+  $nonce = isset($_POST['gachasoku_hit_admin_nonce']) ? $_POST['gachasoku_hit_admin_nonce'] : '';
+
+  if ($action === 'delete' && $post_id > 0) {
+    if (!wp_verify_nonce($nonce, 'gachasoku_hit_delete_' . $post_id)) {
+      add_settings_error('gachasoku_hit_admin', 'hit_nonce', '削除に失敗しました。ページを再読み込みしてから再度お試しください。', 'error');
+      return;
+    }
+
+    if (gachasoku_delete_hit_post($post_id)) {
+      add_settings_error('gachasoku_hit_admin', 'hit_deleted', '投稿を削除しました。', 'updated');
+    } else {
+      add_settings_error('gachasoku_hit_admin', 'hit_delete_failed', '投稿を削除できませんでした。', 'error');
     }
   }
 }
