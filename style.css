@@ -1785,6 +1785,19 @@ footer p {
     padding: 8px;
   }
 
+  .ranking-slider__viewport {
+    padding: 0;
+  }
+
+  .ranking-slider__nav {
+    display: none;
+  }
+
+  .ranking-list {
+    padding: 12px 0 20px;
+    gap: 12px;
+  }
+
   .oripa-index .section {
     padding: 58px 0;
   }
@@ -1835,6 +1848,7 @@ footer p {
   .ranking-card {
     width: 100%;
     padding: 16px;
+    margin: 0;
   }
 
   .ranking-card__main {

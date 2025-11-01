@@ -191,6 +191,7 @@
       trigger.hidden = true;
       trigger.setAttribute('aria-expanded', 'true');
       trigger.textContent = finalLabel;
+      trigger.setAttribute('aria-label', trigger.textContent);
       return;
     }
 
@@ -209,6 +210,7 @@
       trigger.hidden = true;
       trigger.setAttribute('aria-expanded', 'true');
       trigger.textContent = finalLabel;
+      trigger.setAttribute('aria-label', trigger.textContent);
 
       calendar.classList.remove('gachasoku-calendar--collapsed');
       calendar.classList.add('gachasoku-calendar--expanded');
@@ -240,9 +242,8 @@
 
       trigger.hidden = !hasMore;
       trigger.setAttribute('aria-expanded', hasMore ? 'false' : 'true');
-      trigger.textContent = hasMore
-        ? `${segments[currentSegment + 1].start}日〜${segments[currentSegment + 1].end}日を表示`
-        : finalLabel;
+      trigger.textContent = hasMore ? baseLabel : finalLabel;
+      trigger.setAttribute('aria-label', trigger.textContent);
 
       if (hasMore) {
         calendar.classList.add('gachasoku-calendar--collapsed');
