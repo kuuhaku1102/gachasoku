@@ -29,6 +29,33 @@
       </span>
       <span class="screen-reader-text">メニューを開閉</span>
     </button>
+    <?php
+    $is_member_logged_in = function_exists('gachasoku_is_member_logged_in') && gachasoku_is_member_logged_in();
+    $membership_links     = [];
+
+    if ($is_member_logged_in) {
+      $membership_links[] = [
+        'url'   => gachasoku_get_membership_page_url('member-dashboard'),
+        'label' => 'マイページ',
+      ];
+
+      $membership_links[] = [
+        'url'       => gachasoku_get_member_logout_url(),
+        'label'     => 'ログアウト',
+        'is_logout' => true,
+      ];
+    } else {
+      $membership_links[] = [
+        'url'   => gachasoku_get_membership_page_url('member-register'),
+        'label' => '会員登録',
+      ];
+
+      $membership_links[] = [
+        'url'   => gachasoku_get_membership_page_url('member-login'),
+        'label' => 'ログイン',
+      ];
+    }
+    ?>
     <nav class="site-header__nav" id="primary-navigation" aria-label="メインメニュー">
       <?php
       wp_nav_menu([
@@ -37,15 +64,16 @@
         'container'      => false,
       ]);
       ?>
+      <div class="site-header__membership site-header__membership--mobile">
+        <?php foreach ($membership_links as $link) : ?>
+          <a class="site-header__membership-link<?php echo !empty($link['is_logout']) ? ' site-header__membership-link--logout' : ''; ?>" href="<?php echo esc_url($link['url']); ?>"><?php echo esc_html($link['label']); ?></a>
+        <?php endforeach; ?>
+      </div>
     </nav>
-    <div class="site-header__membership">
-      <?php if (function_exists('gachasoku_is_member_logged_in') && gachasoku_is_member_logged_in()) : ?>
-        <a class="site-header__membership-link" href="<?php echo esc_url(gachasoku_get_membership_page_url('member-dashboard')); ?>">マイページ</a>
-        <a class="site-header__membership-link site-header__membership-link--logout" href="<?php echo esc_url(gachasoku_get_member_logout_url()); ?>">ログアウト</a>
-      <?php else : ?>
-        <a class="site-header__membership-link" href="<?php echo esc_url(gachasoku_get_membership_page_url('member-register')); ?>">会員登録</a>
-        <a class="site-header__membership-link" href="<?php echo esc_url(gachasoku_get_membership_page_url('member-login')); ?>">ログイン</a>
-      <?php endif; ?>
+    <div class="site-header__membership site-header__membership--desktop">
+      <?php foreach ($membership_links as $link) : ?>
+        <a class="site-header__membership-link<?php echo !empty($link['is_logout']) ? ' site-header__membership-link--logout' : ''; ?>" href="<?php echo esc_url($link['url']); ?>"><?php echo esc_html($link['label']); ?></a>
+      <?php endforeach; ?>
     </div>
   </div>
 </header>
