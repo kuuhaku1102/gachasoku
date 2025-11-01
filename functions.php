@@ -136,6 +136,13 @@ function gachasoku_normalize_ranking_entries($entries, $persist = false) {
       $entry['id'] = sanitize_key($entry['id']);
     }
 
+    if (!isset($entry['name'])) {
+      $entry['name'] = '';
+      $updated = true;
+    } else {
+      $entry['name'] = sanitize_text_field($entry['name']);
+    }
+
     $normalized[] = $entry;
   }
 
@@ -322,6 +329,10 @@ function gachasoku_get_ranking_entry_display_name($entry) {
 
   $candidates = [];
 
+  if (!empty($entry['name'])) {
+    $candidates[] = $entry['name'];
+  }
+
   if (!empty($entry['content'])) {
     $text = trim(wp_strip_all_tags($entry['content']));
     if ($text !== '') {
@@ -500,6 +511,7 @@ function gachasoku_render_ranking_list($entries = null, $args = []) {
     <div class="ranking-slider__viewport">
       <ol class="<?php echo esc_attr($args['list_class']); ?>" data-slider-track>
         <?php foreach ($entries as $entry) :
+      $name = isset($entry['name']) ? $entry['name'] : '';
       $position = isset($entry['position']) ? $entry['position'] : '';
       $rank_label = isset($entry['current_rank_label']) ? $entry['current_rank_label'] : '';
       $entry_id = isset($entry['id']) ? sanitize_key($entry['id']) : '';
@@ -516,6 +528,7 @@ function gachasoku_render_ranking_list($entries = null, $args = []) {
       $has_detail = $detail_label && $detail_url;
       $has_official = $official_label && $official_url;
       $has_actions = $has_detail || $has_official;
+      $has_body = $name || $content;
       $stats = isset($entry['vote_stats']) ? $entry['vote_stats'] : ['wins' => 0, 'losses' => 0, 'logpos' => 0, 'formatted' => '0.0%'];
       $member_stats = isset($entry['member_vote_stats']) ? $entry['member_vote_stats'] : ['wins' => 0, 'losses' => 0, 'logpos' => 0, 'formatted' => '0.0%'];
       $vote_nonce = $entry_id ? wp_create_nonce('gachasoku_ranking_vote_' . $entry_id) : '';
@@ -551,9 +564,14 @@ function gachasoku_render_ranking_list($entries = null, $args = []) {
                   <?php endif; ?>
                 </div>
               <?php endif; ?>
-              <?php if ($content) : ?>
+              <?php if ($has_body) : ?>
                 <div class="ranking-card__body">
-                  <div class="ranking-card__content"><?php echo wpautop(wp_kses_post($content)); ?></div>
+                  <?php if ($name) : ?>
+                    <h3 class="ranking-card__name"><?php echo esc_html($name); ?></h3>
+                  <?php endif; ?>
+                  <?php if ($content) : ?>
+                    <div class="ranking-card__content"><?php echo wpautop(wp_kses_post($content)); ?></div>
+                  <?php endif; ?>
                 </div>
               <?php endif; ?>
             </div>
@@ -749,6 +767,7 @@ function gachasoku_save_ranking_entries($raw_entries) {
     if ($entry_id === '') {
       $entry_id = gachasoku_generate_ranking_entry_id();
     }
+    $name = isset($entry['name']) ? sanitize_text_field($entry['name']) : '';
     $position = isset($entry['position']) ? sanitize_text_field($entry['position']) : '';
     $image_url = isset($entry['image_url']) ? esc_url_raw($entry['image_url']) : '';
     $image_link = isset($entry['image_link']) ? esc_url_raw($entry['image_link']) : '';
@@ -758,12 +777,23 @@ function gachasoku_save_ranking_entries($raw_entries) {
     $official_label = isset($entry['official_label']) ? sanitize_text_field($entry['official_label']) : '';
     $official_url = isset($entry['official_url']) ? esc_url_raw($entry['official_url']) : '';
 
-    if ($position === '' && $image_url === '' && $image_link === '' && $content === '' && $detail_label === '' && $detail_url === '' && $official_label === '' && $official_url === '') {
+    if (
+      $name === '' &&
+      $position === '' &&
+      $image_url === '' &&
+      $image_link === '' &&
+      $content === '' &&
+      $detail_label === '' &&
+      $detail_url === '' &&
+      $official_label === '' &&
+      $official_url === ''
+    ) {
       continue;
     }
 
     $entries[] = [
       'id' => $entry_id,
+      'name' => $name,
       'position' => $position,
       'image_url' => $image_url,
       'image_link' => $image_link,
@@ -850,6 +880,7 @@ function gachasoku_render_ranking_entry_fields($index, $entry) {
   if ($entry_id === '' && $index !== '__INDEX__') {
     $entry_id = gachasoku_generate_ranking_entry_id();
   }
+  $name = isset($entry['name']) ? $entry['name'] : '';
   $position = isset($entry['position']) ? $entry['position'] : '';
   $image_url = isset($entry['image_url']) ? $entry['image_url'] : '';
   $image_link = isset($entry['image_link']) ? $entry['image_link'] : '';
@@ -863,6 +894,10 @@ function gachasoku_render_ranking_entry_fields($index, $entry) {
     <h2>項目 <span class="gachasoku-entry-number"></span></h2>
     <div class="gachasoku-ranking-fields">
       <input type="hidden" name="gachasoku_ranking_entries[<?php echo esc_attr($index); ?>][id]" value="<?php echo esc_attr($entry_id); ?>" />
+      <label>
+        名前
+        <input type="text" name="gachasoku_ranking_entries[<?php echo esc_attr($index); ?>][name]" value="<?php echo esc_attr($name); ?>" placeholder="例: サイト名" />
+      </label>
       <label>
         順位
         <input type="text" name="gachasoku_ranking_entries[<?php echo esc_attr($index); ?>][position]" value="<?php echo esc_attr($position); ?>" placeholder="例: 1位" />
