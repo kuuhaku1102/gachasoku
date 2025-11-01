@@ -1149,6 +1149,7 @@ footer p {
   text-align: center;
   display: grid;
   gap: 12px;
+  justify-items: center;
 }
 
 .gachasoku-calendar__pickup-label {
@@ -1167,6 +1168,13 @@ footer p {
   border-radius: 999px;
   font-weight: 600;
   transition: background 0.2s ease;
+  max-width: 100%;
+  width: min(100%, 320px);
+  box-sizing: border-box;
+  white-space: normal;
+  line-height: 1.4;
+  word-break: break-word;
+  flex-wrap: wrap;
 }
 
 .gachasoku-calendar__pickup-button:hover,
@@ -1229,6 +1237,10 @@ footer p {
   }
 
   .gachasoku-calendar__more {
+    width: 100%;
+  }
+
+  .gachasoku-calendar__pickup-button {
     width: 100%;
   }
 
