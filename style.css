@@ -371,15 +371,15 @@ footer p {
   position: absolute;
   top: 50%;
   transform: translateY(-50%);
-  width: 44px;
-  height: 44px;
+  width: 40px;
+  height: 40px;
   border-radius: 999px;
   border: none;
   background: rgba(255, 255, 255, 0.92);
   box-shadow: 0 12px 28px rgba(15, 23, 42, 0.18);
   display: grid;
   place-items: center;
-  font-size: 1.6rem;
+  font-size: 1.4rem;
   color: var(--dark-gray);
   cursor: pointer;
   transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
@@ -417,7 +417,7 @@ footer p {
   padding: 12px 0 20px;
   margin: 0;
   display: flex;
-  gap: 24px;
+  gap: 0;
   overflow-x: auto;
   scroll-snap-type: x mandatory;
   scroll-padding: 12px;
@@ -441,54 +441,58 @@ footer p {
 
 .ranking-list__item {
   scroll-snap-align: start;
-  flex: 0 0 clamp(260px, calc((100% - 48px) / 2.5), 360px);
+  flex: 0 0 100%;
   display: flex;
 }
 
 .ranking-card {
   position: relative;
   background: var(--white);
-  border-radius: 16px;
-  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.1);
-  padding: 20px 22px;
-  display: flex;
+  border-radius: 14px;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.08);
+  padding: 18px;
+  display: grid;
+  grid-template-columns: minmax(120px, 38%) 1fr;
   align-items: stretch;
-  gap: 18px;
+  gap: 16px;
   min-height: 0;
+  width: min(420px, calc(100% - 32px));
+  margin: 0 auto;
 }
 
 .ranking-card--has-badge {
-  padding-top: 38px;
+  padding-top: 34px;
 }
 
 .ranking-card--no-image {
+  display: flex;
   flex-direction: column;
+  width: min(380px, calc(100% - 32px));
 }
 
 .ranking-card__badge {
   position: absolute;
-  top: 16px;
-  left: 20px;
-  padding: 8px 16px;
-  min-width: 56px;
+  top: 14px;
+  left: 18px;
+  padding: 6px 14px;
+  min-width: 52px;
   border-radius: 999px;
   background: var(--main-yellow);
   color: var(--dark-gray);
   font-weight: 700;
-  font-size: 0.95rem;
+  font-size: 0.85rem;
   text-align: center;
-  box-shadow: 0 10px 24px rgba(253, 224, 71, 0.38);
+  box-shadow: 0 8px 18px rgba(253, 224, 71, 0.32);
 }
 
 .ranking-card__image {
   border-radius: 12px;
   overflow: hidden;
   background: #f1f5f9;
-  flex: 0 0 clamp(130px, 28%, 180px);
   display: flex;
   align-items: center;
   justify-content: center;
-  aspect-ratio: 16 / 9;
+  aspect-ratio: 4 / 3;
 }
 
 .ranking-card__image a,
@@ -500,18 +504,17 @@ footer p {
 }
 
 .ranking-card__body {
-  flex: 1 1 auto;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  gap: 14px;
+  gap: 12px;
   min-width: 0;
 }
 
 .ranking-card__content {
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   color: #374151;
-  line-height: 1.6;
+  line-height: 1.55;
 }
 
 .ranking-card__content p:last-child {
@@ -521,7 +524,7 @@ footer p {
 .ranking-card__actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 8px;
   margin-top: auto;
   width: 100%;
   justify-content: flex-start;
@@ -531,14 +534,14 @@ footer p {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 11px 18px;
-  border-radius: 999px;
+  padding: 10px 16px;
+  border-radius: 32px;
   font-weight: 700;
   text-decoration: none;
   transition: var(--transition);
-  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.12);
-  flex: 1 1 150px;
-  min-width: 130px;
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.12);
+  flex: 1 1 140px;
+  min-width: 120px;
 }
 
 .ranking-card__button--detail {
@@ -577,40 +580,28 @@ footer p {
   }
 
   .ranking-list__item {
-    flex: 0 0 74%;
-  }
-
-  .ranking-card {
-    gap: 20px;
-  }
-
-  .ranking-card__image {
-    flex-basis: clamp(140px, 52%, 200px);
+    flex: 0 0 100%;
   }
 }
 
 @media (max-width: 768px) {
-  .ranking-list {
-    gap: 20px;
-  }
-
   .ranking-list__item {
-    flex: 0 0 82%;
+    flex: 0 0 100%;
   }
 
   .ranking-card {
-    flex-direction: column;
-    padding: 24px;
+    width: calc(100% - 16px);
+    grid-template-columns: 1fr;
+    padding: 20px;
   }
 
   .ranking-card__image {
-    flex: 0 0 auto;
-    aspect-ratio: 4 / 3;
+    aspect-ratio: 16 / 9;
     width: 100%;
   }
 
   .ranking-card__body {
-    gap: 16px;
+    gap: 14px;
   }
 
   .ranking-card__actions {
@@ -624,7 +615,7 @@ footer p {
 
 @media (max-width: 520px) {
   .ranking-list__item {
-    flex: 0 0 90%;
+    flex: 0 0 100%;
   }
 
   .ranking-card__actions {
