@@ -14,7 +14,7 @@ if (!defined('GACHASOKU_MEMBER_STATUS_WITHDRAWN')) {
 }
 
 if (!defined('GACHASOKU_MEMBERSHIP_DB_VERSION')) {
-  define('GACHASOKU_MEMBERSHIP_DB_VERSION', '2.0.0');
+  define('GACHASOKU_MEMBERSHIP_DB_VERSION', '2.1.0');
 }
 
 if (!defined('GACHASOKU_MEMBERSHIP_PAGES_VERSION')) {
@@ -596,6 +596,7 @@ function gachasoku_install_membership_tables() {
   $sessions_table = gachasoku_get_member_sessions_table();
   $entries_table = $wpdb->prefix . 'gachasoku_campaign_entries';
   $logs_table = $wpdb->prefix . 'gachasoku_campaign_draw_logs';
+  $votes_table = $wpdb->prefix . 'gachasoku_ranking_votes';
 
   $members_sql = "CREATE TABLE {$members_table} (
     id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
@@ -650,10 +651,23 @@ function gachasoku_install_membership_tables() {
     KEY executed_at (executed_at)
   ) {$charset_collate};";
 
+  $votes_sql = "CREATE TABLE {$votes_table} (
+    id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+    entry_id varchar(191) NOT NULL,
+    member_id bigint(20) unsigned NOT NULL,
+    vote_type varchar(20) NOT NULL,
+    created_at datetime NOT NULL,
+    PRIMARY KEY  (id),
+    KEY entry_member (entry_id(64), member_id, created_at),
+    KEY member_id (member_id),
+    KEY created_at (created_at)
+  ) {$charset_collate};";
+
   dbDelta($members_sql);
   dbDelta($sessions_sql);
   dbDelta($entries_sql);
   dbDelta($logs_sql);
+  dbDelta($votes_sql);
 
   gachasoku_migrate_existing_wp_members();
 
@@ -1724,6 +1738,11 @@ function gachasoku_member_dashboard_shortcode() {
     </section>
 
     <section class="gachasoku-dashboard__section">
+      <h2 class="gachasoku-dashboard__title">ランキング投票状況</h2>
+      <?php echo gachasoku_render_member_ranking_summary($member['id']); ?>
+    </section>
+
+    <section class="gachasoku-dashboard__section">
       <h2 class="gachasoku-dashboard__title">開催中のキャンペーン</h2>
       <?php echo gachasoku_render_campaign_cards($open_campaigns, [
         'empty_message' => '現在開催中のキャンペーンはありません。',
@@ -1791,6 +1810,69 @@ function gachasoku_render_dashboard_campaign_list($entries, $empty_message, $sho
       </li>
     <?php endforeach; ?>
   </ul>
+  <?php
+  return ob_get_clean();
+}
+
+function gachasoku_render_member_ranking_summary($member_id) {
+  if (!function_exists('gachasoku_get_sorted_ranking_entries')) {
+    return '<p class="gachasoku-dashboard__empty">ランキング情報を取得できませんでした。</p>';
+  }
+
+  $entries = gachasoku_get_sorted_ranking_entries($member_id);
+  if (empty($entries)) {
+    return '<p class="gachasoku-dashboard__empty">現在表示できるランキングはありません。</p>';
+  }
+
+  ob_start();
+  ?>
+  <div class="gachasoku-dashboard__ranking">
+    <table class="gachasoku-dashboard__ranking-table">
+      <thead>
+        <tr>
+          <th scope="col">順位</th>
+          <th scope="col">ランキング</th>
+          <th scope="col">全体勝率</th>
+          <th scope="col">あなたの戦績</th>
+        </tr>
+      </thead>
+      <tbody>
+        <?php foreach ($entries as $entry) :
+          $rank_label = isset($entry['current_rank_label']) ? $entry['current_rank_label'] : '';
+          $label = isset($entry['position']) ? trim($entry['position']) : '';
+          if ($label === '') {
+            $label = isset($entry['detail_label']) && $entry['detail_label'] ? $entry['detail_label'] : '';
+          }
+          if ($label === '' && isset($entry['official_label'])) {
+            $label = $entry['official_label'];
+          }
+          if ($label === '') {
+            $label = 'ランキング';
+          }
+          $stats = isset($entry['vote_stats']) ? $entry['vote_stats'] : ['wins' => 0, 'losses' => 0, 'logpos' => 0, 'formatted' => '0.0%'];
+          $member_stats = isset($entry['member_vote_stats']) ? $entry['member_vote_stats'] : ['wins' => 0, 'losses' => 0, 'logpos' => 0, 'formatted' => '0.0%'];
+          $member_total_votes = intval($member_stats['wins']) + intval($member_stats['losses']) + intval($member_stats['logpos']);
+          ?>
+          <tr>
+            <td data-label="順位"><?php echo esc_html($rank_label); ?></td>
+            <td data-label="ランキング"><?php echo esc_html($label); ?></td>
+            <td data-label="全体勝率">
+              <span class="gachasoku-dashboard__ranking-rate"><?php echo esc_html($stats['formatted']); ?></span>
+              <small class="gachasoku-dashboard__ranking-counts">(勝ち <?php echo esc_html(number_format_i18n($stats['wins'])); ?> / 負け <?php echo esc_html(number_format_i18n($stats['losses'])); ?> / ログポ <?php echo esc_html(number_format_i18n($stats['logpos'])); ?>)</small>
+            </td>
+            <td data-label="あなたの戦績">
+              <?php if ($member_total_votes > 0) : ?>
+                <span class="gachasoku-dashboard__ranking-rate"><?php echo esc_html($member_stats['formatted']); ?></span>
+                <small class="gachasoku-dashboard__ranking-counts">(勝ち <?php echo esc_html(number_format_i18n($member_stats['wins'])); ?> / 負け <?php echo esc_html(number_format_i18n($member_stats['losses'])); ?> / ログポ <?php echo esc_html(number_format_i18n($member_stats['logpos'])); ?>)</small>
+              <?php else : ?>
+                <span class="gachasoku-dashboard__ranking-empty">未投票</span>
+              <?php endif; ?>
+            </td>
+          </tr>
+        <?php endforeach; ?>
+      </tbody>
+    </table>
+  </div>
   <?php
   return ob_get_clean();
 }

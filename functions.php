@@ -37,6 +37,35 @@ add_action('wp_enqueue_scripts', function() {
       ],
     ]
   );
+
+  wp_enqueue_script(
+    'gachasoku-ranking',
+    get_template_directory_uri() . '/js/ranking.js',
+    [],
+    '1.0.0',
+    true
+  );
+
+  $login_url    = function_exists('gachasoku_get_membership_page_url') ? gachasoku_get_membership_page_url('member-login') : wp_login_url();
+  $register_url = function_exists('gachasoku_get_membership_page_url') ? gachasoku_get_membership_page_url('member-register') : wp_registration_url();
+
+  wp_localize_script(
+    'gachasoku-ranking',
+    'gachasokuRanking',
+    [
+      'ajaxUrl'  => admin_url('admin-ajax.php'),
+      'messages' => [
+        'genericError'  => '投票中にエラーが発生しました。時間をおいて再度お試しください。',
+        'loginRequired' => '投票にはログインが必要です。',
+        'cooldown'      => '同じランキングには1時間に1度しか投票できません。',
+        'success'       => '投票を受け付けました。',
+      ],
+      'links'   => [
+        'login'    => $login_url,
+        'register' => $register_url,
+      ],
+    ]
+  );
 });
 
 function gachasoku_get_archive_site_terms() {
@@ -87,31 +116,296 @@ function gachasoku_apply_archive_filters($query) {
 }
 add_action('pre_get_posts', 'gachasoku_apply_archive_filters');
 
+function gachasoku_generate_ranking_entry_id() {
+  return sanitize_key('rk_' . wp_generate_password(12, false));
+}
+
+function gachasoku_normalize_ranking_entries($entries, $persist = false) {
+  $normalized = [];
+  $updated = false;
+
+  foreach ($entries as $entry) {
+    if (!is_array($entry)) {
+      continue;
+    }
+
+    if (empty($entry['id'])) {
+      $entry['id'] = gachasoku_generate_ranking_entry_id();
+      $updated = true;
+    } else {
+      $entry['id'] = sanitize_key($entry['id']);
+    }
+
+    $normalized[] = $entry;
+  }
+
+  if ($updated && $persist) {
+    update_option('gachasoku_ranking_entries', $normalized);
+  }
+
+  return $normalized;
+}
+
+function gachasoku_get_ranking_votes_table() {
+  global $wpdb;
+  return $wpdb->prefix . 'gachasoku_ranking_votes';
+}
+
+function gachasoku_calculate_win_rate($wins, $losses) {
+  $wins = max(0, intval($wins));
+  $losses = max(0, intval($losses));
+  $total = $wins + $losses;
+  if ($total <= 0) {
+    return 0.0;
+  }
+  return round(($wins / $total) * 100, 1);
+}
+
+function gachasoku_get_ranking_vote_totals($entry_ids) {
+  global $wpdb;
+
+  $entry_ids = array_values(array_filter(array_map('sanitize_key', (array) $entry_ids)));
+  if (empty($entry_ids)) {
+    return [];
+  }
+
+  $table = gachasoku_get_ranking_votes_table();
+  $placeholders = implode(',', array_fill(0, count($entry_ids), '%s'));
+
+  $query = $wpdb->prepare(
+    "SELECT entry_id, SUM(vote_type = 'win') AS wins, SUM(vote_type = 'lose') AS losses, SUM(vote_type = 'logpo') AS logpos FROM {$table} WHERE entry_id IN ({$placeholders}) GROUP BY entry_id",
+    $entry_ids
+  );
+
+  $rows = $wpdb->get_results($query, ARRAY_A);
+  $totals = [];
+
+  if ($rows) {
+    foreach ($rows as $row) {
+      $entry_id = sanitize_key($row['entry_id']);
+      $totals[$entry_id] = [
+        'wins'   => intval($row['wins']),
+        'losses' => intval($row['losses']),
+        'logpos' => intval($row['logpos']),
+      ];
+    }
+  }
+
+  return $totals;
+}
+
+function gachasoku_get_member_ranking_vote_totals($member_id, $entry_ids = []) {
+  global $wpdb;
+
+  $member_id = intval($member_id);
+  if ($member_id <= 0) {
+    return [];
+  }
+
+  $table = gachasoku_get_ranking_votes_table();
+  $where = 'member_id = %d';
+  $params = [$member_id];
+
+  $entry_ids = array_values(array_filter(array_map('sanitize_key', (array) $entry_ids)));
+  if (!empty($entry_ids)) {
+    $where .= ' AND entry_id IN (' . implode(',', array_fill(0, count($entry_ids), '%s')) . ')';
+    $params = array_merge($params, $entry_ids);
+  }
+
+  $query = $wpdb->prepare(
+    "SELECT entry_id, SUM(vote_type = 'win') AS wins, SUM(vote_type = 'lose') AS losses, SUM(vote_type = 'logpo') AS logpos FROM {$table} WHERE {$where} GROUP BY entry_id",
+    $params
+  );
+
+  $rows = $wpdb->get_results($query, ARRAY_A);
+  $totals = [];
+
+  if ($rows) {
+    foreach ($rows as $row) {
+      $entry_id = sanitize_key($row['entry_id']);
+      $totals[$entry_id] = [
+        'wins'   => intval($row['wins']),
+        'losses' => intval($row['losses']),
+        'logpos' => intval($row['logpos']),
+      ];
+    }
+  }
+
+  return $totals;
+}
+
+function gachasoku_get_member_last_ranking_vote($entry_id, $member_id) {
+  global $wpdb;
+
+  $entry_id = sanitize_key($entry_id);
+  $member_id = intval($member_id);
+
+  if ($entry_id === '' || $member_id <= 0) {
+    return null;
+  }
+
+  $table = gachasoku_get_ranking_votes_table();
+  $query = $wpdb->prepare(
+    "SELECT created_at FROM {$table} WHERE entry_id = %s AND member_id = %d ORDER BY created_at DESC LIMIT 1",
+    $entry_id,
+    $member_id
+  );
+
+  $result = $wpdb->get_var($query);
+  return $result ? strtotime($result) : null;
+}
+
+function gachasoku_get_member_vote_cooldown($entry_id, $member_id, $interval = HOUR_IN_SECONDS) {
+  $last = gachasoku_get_member_last_ranking_vote($entry_id, $member_id);
+  if (!$last) {
+    return 0;
+  }
+
+  $elapsed = current_time('timestamp') - $last;
+  if ($elapsed >= $interval) {
+    return 0;
+  }
+
+  return max(0, $interval - $elapsed);
+}
+
+function gachasoku_record_ranking_vote($entry_id, $member_id, $vote_type) {
+  global $wpdb;
+
+  $entry_id = sanitize_key($entry_id);
+  $member_id = intval($member_id);
+  $vote_type = sanitize_key($vote_type);
+
+  if ($entry_id === '' || $member_id <= 0) {
+    return new WP_Error('invalid_vote', '投票情報が正しくありません。');
+  }
+
+  $allowed = ['win', 'lose', 'logpo'];
+  if (!in_array($vote_type, $allowed, true)) {
+    return new WP_Error('invalid_vote_type', '選択された投票は利用できません。');
+  }
+
+  $now = current_time('mysql');
+  $table = gachasoku_get_ranking_votes_table();
+  $inserted = $wpdb->insert(
+    $table,
+    [
+      'entry_id'   => $entry_id,
+      'member_id'  => $member_id,
+      'vote_type'  => $vote_type,
+      'created_at' => $now,
+    ],
+    ['%s', '%d', '%s', '%s']
+  );
+
+  if ($inserted === false) {
+    return new WP_Error('db_insert_error', '投票を保存できませんでした。');
+  }
+
+  return $now;
+}
+
+function gachasoku_find_ranking_entry($entry_id) {
+  $entries = gachasoku_get_ranking_entries();
+  foreach ($entries as $entry) {
+    if (isset($entry['id']) && sanitize_key($entry['id']) === $entry_id) {
+      return $entry;
+    }
+  }
+  return null;
+}
+
 function gachasoku_get_ranking_entries() {
   $entries = get_option('gachasoku_ranking_entries', []);
   if (!is_array($entries)) {
     $entries = [];
   }
-  return $entries;
+  return gachasoku_normalize_ranking_entries($entries, true);
 }
 
-function gachasoku_get_sorted_ranking_entries() {
+function gachasoku_get_sorted_ranking_entries($member_id = null) {
   $entries = gachasoku_get_ranking_entries();
 
-  if (!empty($entries)) {
-    usort($entries, function($a, $b) {
-      $posA = isset($a['position']) ? $a['position'] : '';
-      $posB = isset($b['position']) ? $b['position'] : '';
+  if (empty($entries)) {
+    return [];
+  }
 
-      $numA = floatval(preg_replace('/[^0-9.]/', '', $posA));
-      $numB = floatval(preg_replace('/[^0-9.]/', '', $posB));
+  $entry_ids = wp_list_pluck($entries, 'id');
+  $totals = gachasoku_get_ranking_vote_totals($entry_ids);
+  if ($member_id === null && function_exists('gachasoku_get_current_member_id')) {
+    $member_id = gachasoku_get_current_member_id();
+  }
+  $member_id = intval($member_id);
+  $member_totals = $member_id > 0 ? gachasoku_get_member_ranking_vote_totals($member_id, $entry_ids) : [];
 
-      if ($numA === $numB) {
-        return strcmp($posA, $posB);
+  foreach ($entries as &$entry) {
+    $entry_id = $entry['id'];
+    $stats = isset($totals[$entry_id]) ? $totals[$entry_id] : ['wins' => 0, 'losses' => 0, 'logpos' => 0];
+    $wins = isset($stats['wins']) ? intval($stats['wins']) : 0;
+    $losses = isset($stats['losses']) ? intval($stats['losses']) : 0;
+    $logpos = isset($stats['logpos']) ? intval($stats['logpos']) : 0;
+    $win_rate = gachasoku_calculate_win_rate($wins, $losses);
+
+    $entry['vote_stats'] = [
+      'wins'      => $wins,
+      'losses'    => $losses,
+      'logpos'    => $logpos,
+      'win_rate'  => $win_rate,
+      'formatted' => number_format_i18n($win_rate, 1) . '%',
+    ];
+
+    if (isset($member_totals[$entry_id])) {
+      $member_stats = $member_totals[$entry_id];
+      $member_wins = intval($member_stats['wins']);
+      $member_losses = intval($member_stats['losses']);
+      $entry['member_vote_stats'] = [
+        'wins'      => $member_wins,
+        'losses'    => $member_losses,
+        'logpos'    => intval($member_stats['logpos']),
+        'win_rate'  => gachasoku_calculate_win_rate($member_wins, $member_losses),
+      ];
+      $entry['member_vote_stats']['formatted'] = number_format_i18n($entry['member_vote_stats']['win_rate'], 1) . '%';
+    } else {
+      $entry['member_vote_stats'] = [
+        'wins'      => 0,
+        'losses'    => 0,
+        'logpos'    => 0,
+        'win_rate'  => 0,
+        'formatted' => number_format_i18n(0, 1) . '%',
+      ];
+    }
+  }
+  unset($entry);
+
+  usort($entries, function($a, $b) {
+    $statsA = isset($a['vote_stats']) ? $a['vote_stats'] : ['win_rate' => 0, 'wins' => 0];
+    $statsB = isset($b['vote_stats']) ? $b['vote_stats'] : ['win_rate' => 0, 'wins' => 0];
+
+    $rateA = isset($statsA['win_rate']) ? $statsA['win_rate'] : 0;
+    $rateB = isset($statsB['win_rate']) ? $statsB['win_rate'] : 0;
+
+    if ($rateA === $rateB) {
+      $winsA = isset($statsA['wins']) ? $statsA['wins'] : 0;
+      $winsB = isset($statsB['wins']) ? $statsB['wins'] : 0;
+      if ($winsA === $winsB) {
+        $lossA = isset($statsA['losses']) ? $statsA['losses'] : 0;
+        $lossB = isset($statsB['losses']) ? $statsB['losses'] : 0;
+        if ($lossA === $lossB) {
+          $labelA = isset($a['position']) ? $a['position'] : '';
+          $labelB = isset($b['position']) ? $b['position'] : '';
+          return strcmp($labelA, $labelB);
+        }
+        return ($lossA < $lossB) ? -1 : 1;
       }
+      return ($winsA > $winsB) ? -1 : 1;
+    }
 
-      return ($numA < $numB) ? -1 : 1;
-    });
+    return ($rateA > $rateB) ? -1 : 1;
+  });
+
+  foreach ($entries as $index => &$entry) {
+    $entry['current_rank'] = $index + 1;
+    $entry['current_rank_label'] = sprintf('%d位', $entry['current_rank']);
   }
 
   return $entries;
@@ -139,6 +433,22 @@ function gachasoku_render_ranking_list($entries = null, $args = []) {
     $wrapper_classes .= ' ranking-slider--static';
   }
 
+  $member_logged_in = function_exists('gachasoku_is_member_logged_in') ? gachasoku_is_member_logged_in() : false;
+  $member_id = $member_logged_in && function_exists('gachasoku_get_current_member_id') ? gachasoku_get_current_member_id() : 0;
+  $member_status = '';
+  if ($member_logged_in && function_exists('gachasoku_get_member_status')) {
+    $member_status = gachasoku_get_member_status($member_id);
+  }
+  $member_can_vote = $member_logged_in && defined('GACHASOKU_MEMBER_STATUS_ACTIVE') && $member_status === GACHASOKU_MEMBER_STATUS_ACTIVE;
+  $login_url = function_exists('gachasoku_get_membership_page_url') ? gachasoku_get_membership_page_url('member-login') : wp_login_url();
+  $register_url = function_exists('gachasoku_get_membership_page_url') ? gachasoku_get_membership_page_url('member-register') : wp_registration_url();
+
+  $vote_labels = [
+    'win'   => '勝ちに投票',
+    'lose'  => '負けに投票',
+    'logpo' => 'ログポに投票',
+  ];
+
   ob_start();
   ?>
   <div class="<?php echo esc_attr($wrapper_classes); ?>" data-ranking-slider>
@@ -149,6 +459,8 @@ function gachasoku_render_ranking_list($entries = null, $args = []) {
       <ol class="<?php echo esc_attr($args['list_class']); ?>" data-slider-track>
         <?php foreach ($entries as $entry) :
       $position = isset($entry['position']) ? $entry['position'] : '';
+      $rank_label = isset($entry['current_rank_label']) ? $entry['current_rank_label'] : '';
+      $entry_id = isset($entry['id']) ? sanitize_key($entry['id']) : '';
       $image_url = isset($entry['image_url']) ? $entry['image_url'] : '';
       $image_link = isset($entry['image_link']) ? $entry['image_link'] : '';
       $image_link = gachasoku_apply_affiliate_url($image_link);
@@ -162,8 +474,11 @@ function gachasoku_render_ranking_list($entries = null, $args = []) {
       $has_detail = $detail_label && $detail_url;
       $has_official = $official_label && $official_url;
       $has_actions = $has_detail || $has_official;
+      $stats = isset($entry['vote_stats']) ? $entry['vote_stats'] : ['wins' => 0, 'losses' => 0, 'logpos' => 0, 'formatted' => '0.0%'];
+      $member_stats = isset($entry['member_vote_stats']) ? $entry['member_vote_stats'] : ['wins' => 0, 'losses' => 0, 'logpos' => 0, 'formatted' => '0.0%'];
+      $vote_nonce = $entry_id ? wp_create_nonce('gachasoku_ranking_vote_' . $entry_id) : '';
       $card_classes = ['ranking-card'];
-      if ($position) {
+      if ($rank_label) {
         $card_classes[] = 'ranking-card--has-badge';
       }
       if (!$image_url) {
@@ -171,9 +486,16 @@ function gachasoku_render_ranking_list($entries = null, $args = []) {
       }
       ?>
         <li class="<?php echo esc_attr($args['item_class']); ?>">
-          <article class="<?php echo esc_attr(implode(' ', $card_classes)); ?>">
-            <?php if ($position) : ?>
-              <span class="ranking-card__badge"><?php echo esc_html($position); ?></span>
+          <article class="<?php echo esc_attr(implode(' ', $card_classes)); ?>" <?php if ($entry_id) : ?>data-ranking-entry="<?php echo esc_attr($entry_id); ?>"<?php endif; ?>>
+            <?php if ($rank_label) :
+              $additional_label = ($position && $position !== $rank_label) ? $position : '';
+              ?>
+              <span class="ranking-card__badge">
+                <strong class="ranking-card__badge-rank"><?php echo esc_html($rank_label); ?></strong>
+                <?php if ($additional_label) : ?>
+                  <span class="ranking-card__badge-label"><?php echo esc_html($additional_label); ?></span>
+                <?php endif; ?>
+              </span>
             <?php endif; ?>
             <div class="ranking-card__main">
               <?php if ($image_url) : ?>
@@ -191,6 +513,53 @@ function gachasoku_render_ranking_list($entries = null, $args = []) {
                 <div class="ranking-card__body">
                   <div class="ranking-card__content"><?php echo wpautop(wp_kses_post($content)); ?></div>
                 </div>
+              <?php endif; ?>
+            </div>
+            <div class="ranking-card__metrics" <?php if ($entry_id) : ?>data-ranking-stats="<?php echo esc_attr($entry_id); ?>"<?php endif; ?>>
+              <div class="ranking-card__metric">
+                <span class="ranking-card__metric-label">勝ち</span>
+                <span class="ranking-card__metric-value" data-stat="wins"><?php echo esc_html(number_format_i18n($stats['wins'])); ?></span>
+              </div>
+              <div class="ranking-card__metric">
+                <span class="ranking-card__metric-label">負け</span>
+                <span class="ranking-card__metric-value" data-stat="losses"><?php echo esc_html(number_format_i18n($stats['losses'])); ?></span>
+              </div>
+              <div class="ranking-card__metric">
+                <span class="ranking-card__metric-label">ログポ</span>
+                <span class="ranking-card__metric-value" data-stat="logpos"><?php echo esc_html(number_format_i18n($stats['logpos'])); ?></span>
+              </div>
+              <div class="ranking-card__metric ranking-card__metric--rate">
+                <span class="ranking-card__metric-label">勝率</span>
+                <span class="ranking-card__metric-value" data-stat="win-rate"><?php echo esc_html($stats['formatted']); ?></span>
+              </div>
+            </div>
+            <?php if ($member_logged_in) : ?>
+              <div class="ranking-card__personal" <?php if ($entry_id) : ?>data-ranking-personal="<?php echo esc_attr($entry_id); ?>"<?php endif; ?>>
+                <h4 class="ranking-card__personal-title">あなたの戦績</h4>
+                <ul class="ranking-card__personal-stats">
+                  <li><span>勝ち</span><span data-personal="wins"><?php echo esc_html(number_format_i18n($member_stats['wins'])); ?></span></li>
+                  <li><span>負け</span><span data-personal="losses"><?php echo esc_html(number_format_i18n($member_stats['losses'])); ?></span></li>
+                  <li><span>ログポ</span><span data-personal="logpos"><?php echo esc_html(number_format_i18n($member_stats['logpos'])); ?></span></li>
+                  <li class="ranking-card__personal-rate"><span>勝率</span><span data-personal="win-rate"><?php echo esc_html($member_stats['formatted']); ?></span></li>
+                </ul>
+              </div>
+            <?php endif; ?>
+            <div class="ranking-card__votes"<?php if ($entry_id) : ?> data-ranking-actions="<?php echo esc_attr($entry_id); ?>"<?php endif; ?>>
+              <?php if (!$member_logged_in) : ?>
+                <p class="ranking-card__vote-note">投票するには<a href="<?php echo esc_url($login_url); ?>">ログイン</a>してください。未登録の方は<a href="<?php echo esc_url($register_url); ?>">会員登録</a>が必要です。</p>
+              <?php elseif (!$member_can_vote) : ?>
+                <p class="ranking-card__vote-note">現在のステータスでは投票できません。</p>
+              <?php elseif ($entry_id && $vote_nonce) : ?>
+                <div class="ranking-card__vote-buttons">
+                  <?php foreach ($vote_labels as $type => $label) : ?>
+                    <button type="button" class="ranking-card__vote-button ranking-card__vote-button--<?php echo esc_attr($type); ?>" data-ranking-vote="<?php echo esc_attr($type); ?>" data-entry-id="<?php echo esc_attr($entry_id); ?>" data-nonce="<?php echo esc_attr($vote_nonce); ?>">
+                      <?php echo esc_html($label); ?>
+                    </button>
+                  <?php endforeach; ?>
+                </div>
+                <p class="ranking-card__vote-note ranking-card__vote-note--hint">各ランキングには1時間に1度投票できます。</p>
+              <?php else : ?>
+                <p class="ranking-card__vote-note">投票情報を取得できませんでした。</p>
               <?php endif; ?>
             </div>
             <?php if ($has_actions) : ?>
@@ -222,6 +591,101 @@ function gachasoku_render_ranking_list($entries = null, $args = []) {
   return ob_get_clean();
 }
 
+add_action('wp_ajax_gachasoku_ranking_vote', 'gachasoku_ajax_ranking_vote');
+add_action('wp_ajax_nopriv_gachasoku_ranking_vote', 'gachasoku_ajax_ranking_vote');
+function gachasoku_ajax_ranking_vote() {
+  $entry_id = isset($_POST['entry_id']) ? sanitize_key(wp_unslash($_POST['entry_id'])) : '';
+  $vote_type = isset($_POST['vote_type']) ? sanitize_key(wp_unslash($_POST['vote_type'])) : '';
+  $nonce = isset($_POST['nonce']) ? sanitize_text_field(wp_unslash($_POST['nonce'])) : '';
+
+  if ($entry_id === '' || $vote_type === '' || $nonce === '') {
+    wp_send_json_error(['message' => '不正なリクエストです。'], 400);
+  }
+
+  if (!wp_verify_nonce($nonce, 'gachasoku_ranking_vote_' . $entry_id)) {
+    wp_send_json_error(['message' => 'リクエストの有効期限が切れました。再度お試しください。'], 400);
+  }
+
+  $allowed = ['win', 'lose', 'logpo'];
+  if (!in_array($vote_type, $allowed, true)) {
+    wp_send_json_error(['message' => '選択された投票は利用できません。'], 400);
+  }
+
+  $entry = gachasoku_find_ranking_entry($entry_id);
+  if (!$entry) {
+    wp_send_json_error(['message' => '指定されたランキングが見つかりません。'], 404);
+  }
+
+  if (!function_exists('gachasoku_is_member_logged_in') || !gachasoku_is_member_logged_in()) {
+    wp_send_json_error(['message' => '投票にはログインが必要です。'], 403);
+  }
+
+  $member_id = gachasoku_get_current_member_id();
+  if (!$member_id) {
+    wp_send_json_error(['message' => '会員情報を取得できませんでした。'], 403);
+  }
+
+  if (!function_exists('gachasoku_get_member_status')) {
+    wp_send_json_error(['message' => '会員機能が利用できません。'], 500);
+  }
+
+  $status = gachasoku_get_member_status($member_id);
+  if (!defined('GACHASOKU_MEMBER_STATUS_ACTIVE') || $status !== GACHASOKU_MEMBER_STATUS_ACTIVE) {
+    wp_send_json_error(['message' => '現在のステータスでは投票できません。'], 403);
+  }
+
+  $cooldown = gachasoku_get_member_vote_cooldown($entry_id, $member_id);
+  if ($cooldown > 0) {
+    $minutes = ceil($cooldown / MINUTE_IN_SECONDS);
+    $message = $minutes > 1
+      ? sprintf('次の投票まであと%d分お待ちください。', $minutes)
+      : '次の投票までしばらくお待ちください。';
+    wp_send_json_error([
+      'message' => $message,
+      'retry_after' => $cooldown,
+    ], 400);
+  }
+
+  $result = gachasoku_record_ranking_vote($entry_id, $member_id, $vote_type);
+  if (is_wp_error($result)) {
+    wp_send_json_error(['message' => $result->get_error_message()], 500);
+  }
+
+  $totals = gachasoku_get_ranking_vote_totals([$entry_id]);
+  $stats = isset($totals[$entry_id]) ? $totals[$entry_id] : ['wins' => 0, 'losses' => 0, 'logpos' => 0];
+  $wins = intval($stats['wins']);
+  $losses = intval($stats['losses']);
+  $logpos = intval($stats['logpos']);
+  $win_rate = gachasoku_calculate_win_rate($wins, $losses);
+
+  $member_totals = gachasoku_get_member_ranking_vote_totals($member_id, [$entry_id]);
+  $member_stats = isset($member_totals[$entry_id]) ? $member_totals[$entry_id] : ['wins' => 0, 'losses' => 0, 'logpos' => 0];
+  $member_wins = intval($member_stats['wins']);
+  $member_losses = intval($member_stats['losses']);
+  $member_logpos = intval($member_stats['logpos']);
+  $member_rate = gachasoku_calculate_win_rate($member_wins, $member_losses);
+
+  wp_send_json_success([
+    'entryId' => $entry_id,
+    'stats' => [
+      'wins'      => $wins,
+      'losses'    => $losses,
+      'logpos'    => $logpos,
+      'win_rate'  => $win_rate,
+      'formatted' => number_format_i18n($win_rate, 1) . '%',
+    ],
+    'member' => [
+      'wins'      => $member_wins,
+      'losses'    => $member_losses,
+      'logpos'    => $member_logpos,
+      'win_rate'  => $member_rate,
+      'formatted' => number_format_i18n($member_rate, 1) . '%',
+    ],
+    'cooldown' => HOUR_IN_SECONDS,
+    'message'  => '投票ありがとうございました。',
+  ]);
+}
+
 function gachasoku_register_ranking_admin_page() {
   add_menu_page(
     'ランキング管理',
@@ -239,6 +703,10 @@ function gachasoku_save_ranking_entries($raw_entries) {
   $entries = [];
 
   foreach ($raw_entries as $entry) {
+    $entry_id = isset($entry['id']) ? sanitize_key($entry['id']) : '';
+    if ($entry_id === '') {
+      $entry_id = gachasoku_generate_ranking_entry_id();
+    }
     $position = isset($entry['position']) ? sanitize_text_field($entry['position']) : '';
     $image_url = isset($entry['image_url']) ? esc_url_raw($entry['image_url']) : '';
     $image_link = isset($entry['image_link']) ? esc_url_raw($entry['image_link']) : '';
@@ -253,6 +721,7 @@ function gachasoku_save_ranking_entries($raw_entries) {
     }
 
     $entries[] = [
+      'id' => $entry_id,
       'position' => $position,
       'image_url' => $image_url,
       'image_link' => $image_link,
@@ -335,6 +804,10 @@ function gachasoku_render_ranking_admin_page() {
 }
 
 function gachasoku_render_ranking_entry_fields($index, $entry) {
+  $entry_id = isset($entry['id']) ? sanitize_key($entry['id']) : '';
+  if ($entry_id === '' && $index !== '__INDEX__') {
+    $entry_id = gachasoku_generate_ranking_entry_id();
+  }
   $position = isset($entry['position']) ? $entry['position'] : '';
   $image_url = isset($entry['image_url']) ? $entry['image_url'] : '';
   $image_link = isset($entry['image_link']) ? $entry['image_link'] : '';
@@ -347,6 +820,7 @@ function gachasoku_render_ranking_entry_fields($index, $entry) {
   <div class="gachasoku-ranking-entry" data-index="<?php echo esc_attr($index); ?>">
     <h2>項目 <span class="gachasoku-entry-number"></span></h2>
     <div class="gachasoku-ranking-fields">
+      <input type="hidden" name="gachasoku_ranking_entries[<?php echo esc_attr($index); ?>][id]" value="<?php echo esc_attr($entry_id); ?>" />
       <label>
         順位
         <input type="text" name="gachasoku_ranking_entries[<?php echo esc_attr($index); ?>][position]" value="<?php echo esc_attr($position); ?>" placeholder="例: 1位" />
