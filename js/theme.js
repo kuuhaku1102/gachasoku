@@ -144,26 +144,42 @@
     const finalLabel = trigger.dataset.moreFinal || baseLabel;
 
     const segments = (() => {
-      const maxDay = dayCells.reduce((acc, item) => Math.max(acc, item.day), 0);
+      const orderedDays = dayCells
+        .map((item) => item.day)
+        .filter((day) => Number.isFinite(day))
+        .sort((a, b) => a - b);
 
-      if (!maxDay) {
+      if (!orderedDays.length) {
         return [];
       }
 
-      const result = [];
+      const minDay = orderedDays[0];
+      const maxDay = orderedDays[orderedDays.length - 1];
       const chunkSize = 10;
-      let start = 1;
+
+      let startDay = minDay;
+      const year = parseInt(calendar.dataset.calendarYear || '', 10);
+      const month = parseInt(calendar.dataset.calendarMonth || '', 10);
+
+      if (!Number.isNaN(year) && !Number.isNaN(month)) {
+        const today = new Date();
+
+        if (today.getFullYear() === year && today.getMonth() + 1 === month) {
+          const todayDay = today.getDate();
+
+          if (orderedDays.includes(todayDay)) {
+            startDay = todayDay;
+          }
+        }
+      }
+
+      startDay = Math.min(Math.max(startDay, minDay), maxDay);
+
+      const result = [];
+      let start = startDay;
 
       while (start <= maxDay) {
-        let end = Math.min(start + chunkSize - 1, maxDay);
-        const remaining = maxDay - end;
-
-        if (remaining > 0 && remaining < chunkSize) {
-          end = maxDay;
-          result.push({ start, end });
-          break;
-        }
-
+        const end = Math.min(start + chunkSize - 1, maxDay);
         result.push({ start, end });
         start = end + 1;
       }
@@ -171,7 +187,7 @@
       return result;
     })();
 
-    if (segments.length <= 1) {
+    if (!segments.length) {
       trigger.hidden = true;
       trigger.setAttribute('aria-expanded', 'true');
       trigger.textContent = finalLabel;
@@ -199,7 +215,11 @@
     };
 
     const applySegment = () => {
-      const segment = segments[currentSegment];
+      const segment = segments[currentSegment] || segments[segments.length - 1];
+
+      if (!segment) {
+        return;
+      }
 
       dayCells.forEach(({ cell, day }) => {
         const inRange = day >= segment.start && day <= segment.end;
