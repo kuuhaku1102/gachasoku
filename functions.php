@@ -315,6 +315,48 @@ function gachasoku_find_ranking_entry($entry_id) {
   return null;
 }
 
+function gachasoku_get_ranking_entry_display_name($entry) {
+  if (!is_array($entry)) {
+    return '';
+  }
+
+  $candidates = [];
+
+  if (!empty($entry['content'])) {
+    $text = trim(wp_strip_all_tags($entry['content']));
+    if ($text !== '') {
+      $parts = preg_split('/[\r\n]+/', $text);
+      if (!empty($parts)) {
+        $text = trim($parts[0]);
+      }
+      if ($text !== '') {
+        $candidates[] = $text;
+      }
+    }
+  }
+
+  if (!empty($entry['detail_label'])) {
+    $candidates[] = $entry['detail_label'];
+  }
+
+  if (!empty($entry['official_label'])) {
+    $candidates[] = $entry['official_label'];
+  }
+
+  if (!empty($entry['position'])) {
+    $candidates[] = $entry['position'];
+  }
+
+  foreach ($candidates as $candidate) {
+    $candidate = trim(preg_replace('/\s+/', ' ', $candidate));
+    if ($candidate !== '') {
+      return $candidate;
+    }
+  }
+
+  return '';
+}
+
 function gachasoku_get_ranking_entries() {
   $entries = get_option('gachasoku_ranking_entries', []);
   if (!is_array($entries)) {

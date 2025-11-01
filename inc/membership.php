@@ -1831,7 +1831,7 @@ function gachasoku_render_member_ranking_summary($member_id) {
       <thead>
         <tr>
           <th scope="col">順位</th>
-          <th scope="col">ランキング</th>
+          <th scope="col">名前</th>
           <th scope="col">全体勝率</th>
           <th scope="col">あなたの戦績</th>
         </tr>
@@ -1839,15 +1839,11 @@ function gachasoku_render_member_ranking_summary($member_id) {
       <tbody>
         <?php foreach ($entries as $entry) :
           $rank_label = isset($entry['current_rank_label']) ? $entry['current_rank_label'] : '';
-          $label = isset($entry['position']) ? trim($entry['position']) : '';
+          $label = function_exists('gachasoku_get_ranking_entry_display_name')
+            ? gachasoku_get_ranking_entry_display_name($entry)
+            : '';
           if ($label === '') {
-            $label = isset($entry['detail_label']) && $entry['detail_label'] ? $entry['detail_label'] : '';
-          }
-          if ($label === '' && isset($entry['official_label'])) {
-            $label = $entry['official_label'];
-          }
-          if ($label === '') {
-            $label = 'ランキング';
+            $label = '—';
           }
           $stats = isset($entry['vote_stats']) ? $entry['vote_stats'] : ['wins' => 0, 'losses' => 0, 'logpos' => 0, 'formatted' => '0.0%'];
           $member_stats = isset($entry['member_vote_stats']) ? $entry['member_vote_stats'] : ['wins' => 0, 'losses' => 0, 'logpos' => 0, 'formatted' => '0.0%'];
@@ -1855,7 +1851,7 @@ function gachasoku_render_member_ranking_summary($member_id) {
           ?>
           <tr>
             <td data-label="順位"><?php echo esc_html($rank_label); ?></td>
-            <td data-label="ランキング"><?php echo esc_html($label); ?></td>
+            <td data-label="名前"><?php echo esc_html($label); ?></td>
             <td data-label="全体勝率">
               <span class="gachasoku-dashboard__ranking-rate"><?php echo esc_html($stats['formatted']); ?></span>
               <small class="gachasoku-dashboard__ranking-counts">(勝ち <?php echo esc_html(number_format_i18n($stats['wins'])); ?> / 負け <?php echo esc_html(number_format_i18n($stats['losses'])); ?> / ログポ <?php echo esc_html(number_format_i18n($stats['logpos'])); ?>)</small>
