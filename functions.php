@@ -133,10 +133,21 @@ function gachasoku_render_ranking_list($entries = null, $args = []) {
     return $args['empty_message'];
   }
 
+  $entry_count = count($entries);
+  $wrapper_classes = 'ranking-slider';
+  if ($entry_count <= 1) {
+    $wrapper_classes .= ' ranking-slider--static';
+  }
+
   ob_start();
   ?>
-  <ol class="<?php echo esc_attr($args['list_class']); ?>">
-    <?php foreach ($entries as $entry) :
+  <div class="<?php echo esc_attr($wrapper_classes); ?>" data-ranking-slider>
+    <?php if ($entry_count > 1) : ?>
+      <button class="ranking-slider__nav ranking-slider__nav--prev" type="button" aria-label="前のランキング" data-slider-prev>&lsaquo;</button>
+    <?php endif; ?>
+    <div class="ranking-slider__viewport">
+      <ol class="<?php echo esc_attr($args['list_class']); ?>" data-slider-track>
+        <?php foreach ($entries as $entry) :
       $position = isset($entry['position']) ? $entry['position'] : '';
       $image_url = isset($entry['image_url']) ? $entry['image_url'] : '';
       $image_link = isset($entry['image_link']) ? $entry['image_link'] : '';
@@ -148,13 +159,19 @@ function gachasoku_render_ranking_list($entries = null, $args = []) {
       $official_label = isset($entry['official_label']) ? $entry['official_label'] : '';
       $official_url = isset($entry['official_url']) ? $entry['official_url'] : '';
       $official_url = gachasoku_apply_affiliate_url($official_url);
+      $has_detail = $detail_label && $detail_url;
+      $has_official = $official_label && $official_url;
+      $has_actions = $has_detail || $has_official;
+      $card_classes = ['ranking-card'];
+      if ($position) {
+        $card_classes[] = 'ranking-card--has-badge';
+      }
       ?>
-      <li class="<?php echo esc_attr($args['item_class']); ?>">
-        <div class="ranking-card">
-          <?php if ($position) : ?>
-            <div class="ranking-card__position"><?php echo esc_html($position); ?></div>
-          <?php endif; ?>
-          <div class="ranking-card__body">
+        <li class="<?php echo esc_attr($args['item_class']); ?>">
+          <article class="<?php echo esc_attr(implode(' ', $card_classes)); ?>">
+            <?php if ($position) : ?>
+              <span class="ranking-card__badge"><?php echo esc_html($position); ?></span>
+            <?php endif; ?>
             <?php if ($image_url) : ?>
               <div class="ranking-card__image">
                 <?php if ($image_link) : ?>
@@ -169,23 +186,29 @@ function gachasoku_render_ranking_list($entries = null, $args = []) {
             <?php if ($content) : ?>
               <div class="ranking-card__content"><?php echo wpautop(wp_kses_post($content)); ?></div>
             <?php endif; ?>
-            <div class="ranking-card__actions">
-              <?php if ($detail_label && $detail_url) : ?>
-                <a class="ranking-card__button ranking-card__button--detail" href="<?php echo esc_url($detail_url); ?>" target="_blank" rel="noopener noreferrer">
-                  <?php echo esc_html($detail_label); ?>
-                </a>
-              <?php endif; ?>
-              <?php if ($official_label && $official_url) : ?>
-                <a class="ranking-card__button ranking-card__button--official" href="<?php echo esc_url($official_url); ?>" target="_blank" rel="noopener noreferrer">
-                  <?php echo esc_html($official_label); ?>
-                </a>
-              <?php endif; ?>
-            </div>
-          </div>
-        </div>
-      </li>
-    <?php endforeach; ?>
-  </ol>
+            <?php if ($has_actions) : ?>
+              <div class="ranking-card__actions">
+                <?php if ($has_detail) : ?>
+                  <a class="ranking-card__button ranking-card__button--detail" href="<?php echo esc_url($detail_url); ?>" target="_blank" rel="noopener noreferrer">
+                    <?php echo esc_html($detail_label); ?>
+                  </a>
+                <?php endif; ?>
+                <?php if ($has_official) : ?>
+                  <a class="ranking-card__button ranking-card__button--official" href="<?php echo esc_url($official_url); ?>" target="_blank" rel="noopener noreferrer">
+                    <?php echo esc_html($official_label); ?>
+                  </a>
+                <?php endif; ?>
+              </div>
+            <?php endif; ?>
+          </article>
+        </li>
+        <?php endforeach; ?>
+      </ol>
+    </div>
+    <?php if ($entry_count > 1) : ?>
+      <button class="ranking-slider__nav ranking-slider__nav--next" type="button" aria-label="次のランキング" data-slider-next>&rsaquo;</button>
+    <?php endif; ?>
+  </div>
   <?php
   return ob_get_clean();
 }
