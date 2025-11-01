@@ -1976,7 +1976,7 @@ function gachasoku_render_member_ranking_summary($member_id, $entries = null) {
           $member_total_votes = intval($member_stats['wins']) + intval($member_stats['losses']) + intval($member_stats['logpos']);
           ?>
           <tr<?php if ($entry_id) : ?> data-member-ranking-row="<?php echo esc_attr($entry_id); ?>"<?php endif; ?>>
-            <td data-label="順位"><?php echo esc_html($rank_label); ?></td>
+            <td data-label="順位" data-member-rank><?php echo esc_html($rank_label); ?></td>
             <td data-label="名前"><?php echo esc_html($label); ?></td>
             <td data-label="全体勝率"<?php if ($entry_id) : ?> data-member-ranking-stats="<?php echo esc_attr($entry_id); ?>"<?php endif; ?>>
               <span class="gachasoku-dashboard__ranking-rate" data-member-stat="win-rate"><?php echo esc_html($stats['formatted']); ?></span>

@@ -113,6 +113,65 @@
     }
   };
 
+  const refreshMemberRankingSummary = (rankingMap) => {
+    if (!rankingMap || typeof rankingMap !== 'object') {
+      return;
+    }
+
+    const rows = Array.from(document.querySelectorAll('[data-member-ranking-row]'));
+    if (!rows.length) {
+      return;
+    }
+
+    const tbody = rows[0].parentElement;
+    if (!tbody) {
+      return;
+    }
+
+    const rowsWithData = rows.filter((row) => {
+      const entryId = row.getAttribute('data-member-ranking-row');
+      return Boolean(entryId && rankingMap[entryId]);
+    });
+
+    if (!rowsWithData.length) {
+      return;
+    }
+
+    if (rowsWithData.length !== rows.length) {
+      rowsWithData.forEach((row) => {
+        const entryId = row.getAttribute('data-member-ranking-row');
+        const data = rankingMap[entryId] || {};
+        const rankCell = row.querySelector('[data-member-rank]');
+        if (rankCell && data.label) {
+          rankCell.textContent = data.label;
+        }
+        updateMemberRankingStats(entryId, data);
+      });
+      return;
+    }
+
+    const sortedRows = rowsWithData.slice().sort((a, b) => {
+      const dataA = rankingMap[a.getAttribute('data-member-ranking-row')] || {};
+      const dataB = rankingMap[b.getAttribute('data-member-ranking-row')] || {};
+      const rankA = typeof dataA.rank === 'number' ? dataA.rank : parseInt(dataA.rank, 10);
+      const rankB = typeof dataB.rank === 'number' ? dataB.rank : parseInt(dataB.rank, 10);
+      const safeRankA = isFinite(rankA) ? rankA : Number.MAX_SAFE_INTEGER;
+      const safeRankB = isFinite(rankB) ? rankB : Number.MAX_SAFE_INTEGER;
+      return safeRankA - safeRankB;
+    });
+
+    sortedRows.forEach((row) => {
+      const entryId = row.getAttribute('data-member-ranking-row');
+      const data = rankingMap[entryId] || {};
+      const rankCell = row.querySelector('[data-member-rank]');
+      if (rankCell && data.label) {
+        rankCell.textContent = data.label;
+      }
+      updateMemberRankingStats(entryId, data);
+      tbody.appendChild(row);
+    });
+  };
+
   if (campaignButtons.length) {
     const updateButtonState = (button, url) => {
       const container = button.closest('.gachasoku-campaign-card__actions') || button.parentElement;
@@ -319,7 +378,11 @@
 
         return payload.data || {};
       }).then((data) => {
-        updateMemberRankingStats(entryId, data);
+        if (data.ranking) {
+          refreshMemberRankingSummary(data.ranking);
+        } else {
+          updateMemberRankingStats(entryId, data);
+        }
         if (typeSelect) {
           typeSelect.value = '';
         }

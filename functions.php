@@ -733,22 +733,71 @@ function gachasoku_ajax_ranking_vote() {
   $member_logpos = intval($member_stats['logpos']);
   $member_rate = gachasoku_calculate_win_rate($member_wins, $member_losses);
 
+  $ranking_entries = gachasoku_get_sorted_ranking_entries($member_id);
+  $ranking_payload = [];
+
+  if (!empty($ranking_entries)) {
+    foreach ($ranking_entries as $ranking_entry) {
+      if (!isset($ranking_entry['id'])) {
+        continue;
+      }
+
+      $ranking_entry_id = sanitize_key($ranking_entry['id']);
+      if ($ranking_entry_id === '') {
+        continue;
+      }
+
+      $ranking_payload[$ranking_entry_id] = [
+        'rank'  => isset($ranking_entry['current_rank']) ? intval($ranking_entry['current_rank']) : 0,
+        'label' => isset($ranking_entry['current_rank_label']) ? $ranking_entry['current_rank_label'] : '',
+        'stats' => isset($ranking_entry['vote_stats']) ? [
+          'wins'      => intval($ranking_entry['vote_stats']['wins']),
+          'losses'    => intval($ranking_entry['vote_stats']['losses']),
+          'logpos'    => intval($ranking_entry['vote_stats']['logpos']),
+          'win_rate'  => isset($ranking_entry['vote_stats']['win_rate']) ? floatval($ranking_entry['vote_stats']['win_rate']) : gachasoku_calculate_win_rate(intval($ranking_entry['vote_stats']['wins']), intval($ranking_entry['vote_stats']['losses'])),
+          'formatted' => isset($ranking_entry['vote_stats']['formatted']) ? $ranking_entry['vote_stats']['formatted'] : number_format_i18n(0, 1) . '%',
+        ] : [],
+        'member' => isset($ranking_entry['member_vote_stats']) ? [
+          'wins'      => intval($ranking_entry['member_vote_stats']['wins']),
+          'losses'    => intval($ranking_entry['member_vote_stats']['losses']),
+          'logpos'    => intval($ranking_entry['member_vote_stats']['logpos']),
+          'win_rate'  => isset($ranking_entry['member_vote_stats']['win_rate']) ? floatval($ranking_entry['member_vote_stats']['win_rate']) : gachasoku_calculate_win_rate(intval($ranking_entry['member_vote_stats']['wins']), intval($ranking_entry['member_vote_stats']['losses'])),
+          'formatted' => isset($ranking_entry['member_vote_stats']['formatted']) ? $ranking_entry['member_vote_stats']['formatted'] : number_format_i18n(0, 1) . '%',
+        ] : [],
+      ];
+    }
+  }
+
+  $response_stats = [
+    'wins'      => $wins,
+    'losses'    => $losses,
+    'logpos'    => $logpos,
+    'win_rate'  => $win_rate,
+    'formatted' => number_format_i18n($win_rate, 1) . '%',
+  ];
+
+  $response_member = [
+    'wins'      => $member_wins,
+    'losses'    => $member_losses,
+    'logpos'    => $member_logpos,
+    'win_rate'  => $member_rate,
+    'formatted' => number_format_i18n($member_rate, 1) . '%',
+  ];
+
+  if (isset($ranking_payload[$entry_id])) {
+    if (!empty($ranking_payload[$entry_id]['stats'])) {
+      $response_stats = array_merge($response_stats, $ranking_payload[$entry_id]['stats']);
+    }
+    if (!empty($ranking_payload[$entry_id]['member'])) {
+      $response_member = array_merge($response_member, $ranking_payload[$entry_id]['member']);
+    }
+  }
+
   wp_send_json_success([
     'entryId' => $entry_id,
-    'stats' => [
-      'wins'      => $wins,
-      'losses'    => $losses,
-      'logpos'    => $logpos,
-      'win_rate'  => $win_rate,
-      'formatted' => number_format_i18n($win_rate, 1) . '%',
-    ],
-    'member' => [
-      'wins'      => $member_wins,
-      'losses'    => $member_losses,
-      'logpos'    => $member_logpos,
-      'win_rate'  => $member_rate,
-      'formatted' => number_format_i18n($member_rate, 1) . '%',
-    ],
+    'stats'   => $response_stats,
+    'member'  => $response_member,
+    'ranking' => $ranking_payload,
     'cooldown' => HOUR_IN_SECONDS,
     'message'  => '投票ありがとうございました。',
   ]);
