@@ -162,7 +162,6 @@ function gachasoku_render_ranking_list($entries = null, $args = []) {
       $has_detail = $detail_label && $detail_url;
       $has_official = $official_label && $official_url;
       $has_actions = $has_detail || $has_official;
-      $has_body = $content || $has_actions;
       $card_classes = ['ranking-card'];
       if ($position) {
         $card_classes[] = 'ranking-card--has-badge';
@@ -176,36 +175,38 @@ function gachasoku_render_ranking_list($entries = null, $args = []) {
             <?php if ($position) : ?>
               <span class="ranking-card__badge"><?php echo esc_html($position); ?></span>
             <?php endif; ?>
-            <?php if ($image_url) : ?>
-              <div class="ranking-card__image">
-                <?php if ($image_link) : ?>
-                  <a href="<?php echo esc_url($image_link); ?>" target="_blank" rel="noopener noreferrer">
+            <div class="ranking-card__main">
+              <?php if ($image_url) : ?>
+                <div class="ranking-card__image">
+                  <?php if ($image_link) : ?>
+                    <a href="<?php echo esc_url($image_link); ?>" target="_blank" rel="noopener noreferrer">
+                      <img src="<?php echo esc_url($image_url); ?>" alt="">
+                    </a>
+                  <?php else : ?>
                     <img src="<?php echo esc_url($image_url); ?>" alt="">
-                  </a>
-                <?php else : ?>
-                  <img src="<?php echo esc_url($image_url); ?>" alt="">
-                <?php endif; ?>
-              </div>
-            <?php endif; ?>
-            <?php if ($has_body) : ?>
-              <div class="ranking-card__body">
-                <?php if ($content) : ?>
+                  <?php endif; ?>
+                </div>
+              <?php endif; ?>
+              <?php if ($content) : ?>
+                <div class="ranking-card__body">
                   <div class="ranking-card__content"><?php echo wpautop(wp_kses_post($content)); ?></div>
-                <?php endif; ?>
-                <?php if ($has_actions) : ?>
-                  <div class="ranking-card__actions">
-                    <?php if ($has_detail) : ?>
-                      <a class="ranking-card__button ranking-card__button--detail" href="<?php echo esc_url($detail_url); ?>" target="_blank" rel="noopener noreferrer">
-                        <?php echo esc_html($detail_label); ?>
-                      </a>
-                    <?php endif; ?>
-                    <?php if ($has_official) : ?>
-                      <a class="ranking-card__button ranking-card__button--official" href="<?php echo esc_url($official_url); ?>" target="_blank" rel="noopener noreferrer">
-                        <?php echo esc_html($official_label); ?>
-                      </a>
-                    <?php endif; ?>
-                  </div>
-                <?php endif; ?>
+                </div>
+              <?php endif; ?>
+            </div>
+            <?php if ($has_actions) : ?>
+              <div class="ranking-card__cta">
+                <div class="ranking-card__actions">
+                  <?php if ($has_detail) : ?>
+                    <a class="ranking-card__button ranking-card__button--detail" href="<?php echo esc_url($detail_url); ?>" target="_blank" rel="noopener noreferrer">
+                      <?php echo esc_html($detail_label); ?>
+                    </a>
+                  <?php endif; ?>
+                  <?php if ($has_official) : ?>
+                    <a class="ranking-card__button ranking-card__button--official" href="<?php echo esc_url($official_url); ?>" target="_blank" rel="noopener noreferrer">
+                      <?php echo esc_html($official_label); ?>
+                    </a>
+                  <?php endif; ?>
+                </div>
               </div>
             <?php endif; ?>
           </article>
