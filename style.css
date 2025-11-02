@@ -461,11 +461,17 @@ main {
 
 .ranking-slider {
   position: relative;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .ranking-slider__viewport {
   overflow: hidden;
   padding: 0 12px;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .ranking-slider__nav {
@@ -1925,8 +1931,12 @@ main {
     padding: 8px;
   }
 
+  .ranking-slider {
+    overflow: hidden;
+  }
+
   .ranking-slider__viewport {
-    padding: 0 4px;
+    padding: 0;
   }
 
   .ranking-slider__nav {
@@ -1934,7 +1944,7 @@ main {
   }
 
   .ranking-list {
-    padding: 12px 0 20px;
+    padding: 12px 4px 20px;
     gap: 12px;
     display: flex;
     overflow-x: auto;
