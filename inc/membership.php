@@ -1455,6 +1455,7 @@ function gachasoku_get_campaign_card_data($campaign_id) {
     'max_winners' => $fields['max_winners'],
     'chance_up' => !empty($fields['chance_up']),
     'chance_link' => $chance_link,
+    'entry_count' => gachasoku_get_campaign_entry_count($campaign_id),
     'is_open' => gachasoku_is_campaign_open($campaign_id),
     'is_finished' => gachasoku_is_campaign_finished($campaign_id),
   ];
@@ -1551,6 +1552,9 @@ function gachasoku_render_campaign_cards($items, $args = []) {
           <?php endif; ?>
           <?php if (!empty($card['max_winners'])) : ?>
             <span>当選人数：<?php echo esc_html(number_format_i18n($card['max_winners'])); ?>名</span>
+          <?php endif; ?>
+          <?php if (isset($card['entry_count'])) : ?>
+            <span data-campaign-entry-count="<?php echo esc_attr($campaign_id); ?>">応募人数：<?php echo esc_html(number_format_i18n($card['entry_count'])); ?>名</span>
           <?php endif; ?>
         </div>
         <?php if (!empty($card['requirements'])) : ?>
@@ -2882,10 +2886,12 @@ function gachasoku_ajax_apply_campaign() {
 
   $card = gachasoku_get_campaign_card_data($campaign_id);
   $link = ($card && !empty($card['link'])) ? $card['link'] : '';
+  $entry_count = gachasoku_get_campaign_entry_count($campaign_id);
 
   wp_send_json_success([
     'message' => 'キャンペーンに応募しました。結果発表をお待ちください。',
     'url' => $link,
+    'entry_count' => $entry_count,
   ]);
 }
 
