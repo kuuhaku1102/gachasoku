@@ -42,7 +42,7 @@ get_header();
   <section id="hit-board" class="hit-board section">
     <div class="container">
       <h2>みんなのガチャ投稿</h2>
-      <p>会員みんなの当たり報告をピックアップ！気になるサイトの最新当たりカードをチェックしよう。</p>
+      <p>会員みんなのガチャ結果の報告をピックアップ！気になるサイトのリアルな声をチェックしよう。</p>
       <?php echo do_shortcode('[gachasoku_hit_posts limit="5"]'); ?>
     </div>
   </section>
