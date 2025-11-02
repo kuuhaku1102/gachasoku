@@ -25,6 +25,18 @@ if (!defined('GACHASOKU_MEMBER_SESSION_COOKIE')) {
   define('GACHASOKU_MEMBER_SESSION_COOKIE', 'gachasoku_member_session');
 }
 
+if (isset($_COOKIE[GACHASOKU_MEMBER_SESSION_COOKIE]) && $_COOKIE[GACHASOKU_MEMBER_SESSION_COOKIE] !== '') {
+  if (!defined('DONOTCACHEPAGE')) {
+    define('DONOTCACHEPAGE', true);
+  }
+  if (!defined('DONOTCACHEOBJECT')) {
+    define('DONOTCACHEOBJECT', true);
+  }
+  if (!defined('DONOTCACHEDB')) {
+    define('DONOTCACHEDB', true);
+  }
+}
+
 function gachasoku_get_members_table() {
   global $wpdb;
   return $wpdb->prefix . 'gachasoku_members';
@@ -1037,6 +1049,55 @@ function gachasoku_render_membership_messages($context) {
   }
   echo '</div>';
   return ob_get_clean();
+}
+
+add_action('init', 'gachasoku_enforce_member_privacy_headers', 0);
+function gachasoku_enforce_member_privacy_headers() {
+  $has_session_cookie = isset($_COOKIE[GACHASOKU_MEMBER_SESSION_COOKIE]) && $_COOKIE[GACHASOKU_MEMBER_SESSION_COOKIE] !== '';
+
+  $is_membership_post = !empty($_POST['gachasoku_register_submit'])
+    || !empty($_POST['gachasoku_login_submit'])
+    || !empty($_POST['gachasoku_password_reset_submit'])
+    || !empty($_POST['gachasoku_campaign_apply'])
+    || !empty($_POST['gachasoku_hit_post_submit'])
+    || !empty($_POST['gachasoku_vote_submit'])
+    || !empty($_POST['gachasoku_dashboard_vote']);
+
+  if (!$is_membership_post && isset($_POST['action'])) {
+    $action = sanitize_key(wp_unslash($_POST['action']));
+    if (strpos($action, 'gachasoku_') === 0) {
+      $is_membership_post = true;
+    }
+  }
+
+  if (!$has_session_cookie && !$is_membership_post) {
+    return;
+  }
+
+  if (!defined('DONOTCACHEPAGE')) {
+    define('DONOTCACHEPAGE', true);
+  }
+  if (!defined('DONOTCACHEOBJECT')) {
+    define('DONOTCACHEOBJECT', true);
+  }
+  if (!defined('DONOTCACHEDB')) {
+    define('DONOTCACHEDB', true);
+  }
+
+  if (!has_action('send_headers', 'gachasoku_send_membership_privacy_headers')) {
+    add_action('send_headers', 'gachasoku_send_membership_privacy_headers', 0);
+  }
+}
+
+function gachasoku_send_membership_privacy_headers() {
+  if (headers_sent()) {
+    return;
+  }
+
+  nocache_headers();
+  header('Cache-Control: private, no-store, no-cache, must-revalidate, max-age=0');
+  header('Pragma: no-cache');
+  header('Vary: Cookie', false);
 }
 
 add_action('init', 'gachasoku_prime_member_session', 5);
