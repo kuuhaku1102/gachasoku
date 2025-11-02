@@ -2077,7 +2077,7 @@ function gachasoku_member_dashboard_shortcode() {
     </section>
 
     <section class="gachasoku-dashboard__section">
-      <h2 class="gachasoku-dashboard__title">みんなの当たり広場</h2>
+      <h2 class="gachasoku-dashboard__title">みんなのガチャ投稿</h2>
       <?php echo gachasoku_render_member_hit_post_form($member['id'], $ranking_entries, $can_vote); ?>
       <?php echo gachasoku_render_member_hit_post_list($hit_posts); ?>
     </section>
@@ -3195,7 +3195,7 @@ function gachasoku_render_hit_posts_admin_page() {
 
   ?>
   <div class="wrap gachasoku-hit-admin">
-    <h1>みんなの当たり広場</h1>
+    <h1>みんなのガチャ投稿</h1>
     <form method="get" class="gachasoku-hit-admin__filters">
       <input type="hidden" name="page" value="gachasoku-hits" />
       <select name="entry">
