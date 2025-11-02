@@ -6,6 +6,20 @@
   align-items: center;
 }
 
+.gachasoku-member-admin__bulk-actions {
+  margin: 0 0 24px;
+  padding: 16px 20px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #f9fafb;
+  max-width: 520px;
+}
+
+.gachasoku-member-admin__bulk-actions p {
+  margin: 0 0 12px;
+  color: #374151;
+}
+
 .gachasoku-hit-admin__filters {
   margin-bottom: 20px;
   display: flex;

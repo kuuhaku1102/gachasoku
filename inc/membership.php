@@ -312,11 +312,65 @@ function gachasoku_prepare_member_record($member) {
   ]);
 }
 
+function gachasoku_remove_emoji_characters($text) {
+  if ($text === '' || $text === null) {
+    return '';
+  }
+
+  $pattern = '/[\x{1F100}-\x{1F1FF}\x{1F200}-\x{1F2FF}\x{1F300}-\x{1F5FF}\x{1F600}-\x{1F64F}\x{1F680}-\x{1F6FF}\x{1F700}-\x{1F77F}\x{1F780}-\x{1F7FF}\x{1F800}-\x{1F8FF}\x{1F900}-\x{1F9FF}\x{1FA00}-\x{1FAFF}\x{1FB00}-\x{1FBFF}\x{2600}-\x{26FF}\x{2700}-\x{27BF}\x{FE0E}\x{FE0F}\x{200D}\x{1F3FB}-\x{1F3FF}\x{E0020}-\x{E007F}]+/u';
+
+  $cleaned = preg_replace($pattern, '', $text);
+
+  if ($cleaned === null) {
+    return $text;
+  }
+
+  return $cleaned;
+}
+
+function gachasoku_contains_emoji($text) {
+  if ($text === '' || $text === null) {
+    return false;
+  }
+
+  return gachasoku_remove_emoji_characters($text) !== $text;
+}
+
+function gachasoku_normalize_member_name($name) {
+  if ($name === '' || $name === null) {
+    return '';
+  }
+
+  $normalized = wp_strip_all_tags($name);
+
+  $normalized = preg_replace('/\s+/u', ' ', $normalized);
+  if ($normalized === null) {
+    $normalized = '';
+  }
+
+  $normalized = trim($normalized);
+
+  if ($normalized === '') {
+    return '';
+  }
+
+  $normalized = gachasoku_remove_emoji_characters($normalized);
+  $normalized = trim($normalized);
+
+  if ($normalized === '') {
+    return '';
+  }
+
+  $normalized = sanitize_text_field($normalized);
+
+  return $normalized;
+}
+
 function gachasoku_insert_member($name, $email, $password) {
   $email = sanitize_email($email);
-  $name = wp_strip_all_tags($name);
+  $name = gachasoku_normalize_member_name($name);
 
-  if (!$email || !$name) {
+  if (!$email || $name === '') {
     return new WP_Error('invalid_member_data', '会員情報が正しく入力されていません。');
   }
 
@@ -366,6 +420,16 @@ function gachasoku_update_member($member_id, $data) {
 
   foreach ($allowed as $key) {
     if (isset($data[$key])) {
+      if ($key === 'name') {
+        $normalized_name = gachasoku_normalize_member_name($data[$key]);
+        if ($normalized_name === '') {
+          return new WP_Error('invalid_member_name', 'お名前を入力してください。絵文字は使用できません。');
+        }
+        $update[$key] = $normalized_name;
+        $formats[] = '%s';
+        continue;
+      }
+
       $update[$key] = $data[$key];
       $formats[] = '%s';
     }
@@ -416,6 +480,48 @@ function gachasoku_update_member_password($member_id, $password) {
 
   $hash = wp_hash_password($password);
   return gachasoku_update_member($member_id, ['password_hash' => $hash]);
+}
+
+function gachasoku_strip_emoji_from_all_members() {
+  global $wpdb;
+
+  $table = gachasoku_get_members_table();
+  $members = $wpdb->get_results("SELECT id, name FROM {$table}", ARRAY_A);
+
+  if (!is_array($members)) {
+    return new WP_Error('member_query_failed', '会員情報の取得に失敗しました。');
+  }
+
+  $updated = 0;
+
+  foreach ($members as $member) {
+    $normalized = gachasoku_normalize_member_name($member['name']);
+
+    if ($normalized === $member['name']) {
+      continue;
+    }
+
+    $result = $wpdb->update(
+      $table,
+      [
+        'name' => $normalized,
+        'updated_at' => current_time('mysql'),
+      ],
+      ['id' => $member['id']],
+      ['%s', '%s'],
+      ['%d']
+    );
+
+    if ($result === false) {
+      return new WP_Error('member_update_failed', '会員情報の更新に失敗しました。');
+    }
+
+    if ($result > 0) {
+      $updated++;
+    }
+  }
+
+  return $updated;
 }
 
 function gachasoku_get_member_status($member_id) {
@@ -1152,13 +1258,27 @@ function gachasoku_handle_registration() {
     return;
   }
 
-  $name = isset($_POST['gachasoku_register_name']) ? sanitize_text_field($_POST['gachasoku_register_name']) : '';
-  $email = isset($_POST['gachasoku_register_email']) ? sanitize_email($_POST['gachasoku_register_email']) : '';
-  $password = isset($_POST['gachasoku_register_password']) ? $_POST['gachasoku_register_password'] : '';
-  $confirm = isset($_POST['gachasoku_register_password_confirm']) ? $_POST['gachasoku_register_password_confirm'] : '';
+  $raw_name = isset($_POST['gachasoku_register_name']) ? wp_unslash($_POST['gachasoku_register_name']) : '';
+  $email = isset($_POST['gachasoku_register_email']) ? sanitize_email(wp_unslash($_POST['gachasoku_register_email'])) : '';
+  $password = isset($_POST['gachasoku_register_password']) ? wp_unslash($_POST['gachasoku_register_password']) : '';
+  $confirm = isset($_POST['gachasoku_register_password_confirm']) ? wp_unslash($_POST['gachasoku_register_password_confirm']) : '';
 
-  if ($name === '' || $email === '' || $password === '' || $confirm === '') {
+  $trimmed_name = trim(wp_strip_all_tags($raw_name));
+
+  if ($trimmed_name === '' || $email === '' || $password === '' || $confirm === '') {
     gachasoku_add_membership_message('register', 'error', '全ての項目を入力してください。');
+    return;
+  }
+
+  if (gachasoku_contains_emoji($raw_name)) {
+    gachasoku_add_membership_message('register', 'error', 'お名前に絵文字は使用できません。絵文字を削除して再度入力してください。');
+    return;
+  }
+
+  $name = gachasoku_normalize_member_name($raw_name);
+
+  if ($name === '') {
+    gachasoku_add_membership_message('register', 'error', 'お名前を入力してください。');
     return;
   }
 
@@ -1932,6 +2052,7 @@ function gachasoku_register_form_shortcode() {
     <div class="gachasoku-form__field">
       <label for="gachasoku_register_name">お名前</label>
       <input type="text" name="gachasoku_register_name" id="gachasoku_register_name" required placeholder="X名をご入力ください" />
+      <p class="gachasoku-form__note">※お名前に絵文字は使用できません。絵文字が含まれている場合は削除してください。</p>
     </div>
     <div class="gachasoku-form__field">
       <label for="gachasoku_register_email">メールアドレス</label>
@@ -3068,6 +3189,13 @@ function gachasoku_render_member_admin_page() {
 
     <?php settings_errors('gachasoku_member_admin'); ?>
 
+    <form method="post" class="gachasoku-member-admin__bulk-actions" onsubmit="return confirm('全会員の氏名から絵文字を削除します。実行しますか？');">
+      <?php wp_nonce_field('gachasoku_member_strip_emoji', 'gachasoku_member_nonce'); ?>
+      <input type="hidden" name="gachasoku_member_action" value="strip_emoji_all" />
+      <p>登録済み会員の氏名に含まれる絵文字を一括で削除します。実行後は取り消せません。</p>
+      <button type="submit" class="button button-secondary">氏名の絵文字を一括削除</button>
+    </form>
+
     <table class="widefat fixed striped">
       <thead>
         <tr>
@@ -3124,7 +3252,27 @@ function gachasoku_handle_member_admin_actions() {
     return;
   }
 
-  $action = sanitize_text_field($_POST['gachasoku_member_action']);
+  $action = isset($_POST['gachasoku_member_action']) ? sanitize_text_field($_POST['gachasoku_member_action']) : '';
+
+  if ($action === 'strip_emoji_all') {
+    $nonce = isset($_POST['gachasoku_member_nonce']) ? $_POST['gachasoku_member_nonce'] : '';
+    if (!wp_verify_nonce($nonce, 'gachasoku_member_strip_emoji')) {
+      add_settings_error('gachasoku_member_admin', 'nonce_error', '一括削除に失敗しました。ページを再読み込みして再度お試しください。', 'error');
+      return;
+    }
+
+    $result = gachasoku_strip_emoji_from_all_members();
+    if (is_wp_error($result)) {
+      add_settings_error('gachasoku_member_admin', 'emoji_strip_failed', $result->get_error_message(), 'error');
+    } elseif ($result > 0) {
+      add_settings_error('gachasoku_member_admin', 'emoji_stripped', sprintf('氏名から絵文字を削除しました（%d件更新）。', $result), 'updated');
+    } else {
+      add_settings_error('gachasoku_member_admin', 'emoji_stripped_none', '絵文字を含む氏名は見つかりませんでした。', 'updated');
+    }
+
+    return;
+  }
+
   $user_id = isset($_POST['user_id']) ? intval($_POST['user_id']) : 0;
 
   if (!$user_id) {
