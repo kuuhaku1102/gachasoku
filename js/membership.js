@@ -58,6 +58,17 @@
     return number.toLocaleString('ja-JP');
   };
 
+  const updateCampaignEntryCount = (campaignId, count) => {
+    if (!campaignId) {
+      return;
+    }
+    const formatted = formatNumber(count || 0);
+    const selector = '[data-campaign-entry-count="' + campaignId + '"]';
+    document.querySelectorAll(selector).forEach((element) => {
+      element.textContent = '応募人数：' + formatted + '名';
+    });
+  };
+
   const updateMemberRankingStats = (entryId, payload) => {
     if (!entryId || !payload) {
       return;
@@ -240,14 +251,19 @@
       }
     };
 
-    const handleCampaignSuccess = (campaignId, url) => {
+    const handleCampaignSuccess = (campaignId, data, fallbackUrl) => {
+      const destination = data && data.url ? data.url : (fallbackUrl || '');
+      if (data && Object.prototype.hasOwnProperty.call(data, 'entry_count')) {
+        updateCampaignEntryCount(campaignId, data.entry_count);
+      }
+
       const selector = '[data-campaign-apply][data-campaign-id="' + campaignId + '"]';
       document.querySelectorAll(selector).forEach((button) => {
-        updateButtonState(button, url);
+        updateButtonState(button, destination);
       });
 
-      if (url) {
-        window.open(url, '_blank', 'noopener');
+      if (destination) {
+        window.open(destination, '_blank', 'noopener');
       }
     };
 
@@ -312,8 +328,7 @@
         shouldReset = false;
         return payload.data || {};
       }).then((data) => {
-        const destination = data.url || campaignUrl;
-        handleCampaignSuccess(campaignId, destination);
+        handleCampaignSuccess(campaignId, data, campaignUrl);
       }).catch((error) => {
         alert(error.message || messages.genericError);
       }).finally(() => {
