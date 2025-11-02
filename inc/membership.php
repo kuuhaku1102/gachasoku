@@ -826,6 +826,9 @@ function gachasoku_render_campaign_meta_box($post) {
   $image_id = $fields['image_id'];
   $requirements = $fields['requirements'];
   $max_winners = $fields['max_winners'];
+  $chance_up = !empty($fields['chance_up']);
+  $chance_link = $fields['chance_link'];
+  $entry_count = gachasoku_get_campaign_entry_count($post->ID);
 
   $image_src = $image_id ? wp_get_attachment_image_src($image_id, 'medium') : null;
   ?>
@@ -883,6 +886,29 @@ function gachasoku_render_campaign_meta_box($post) {
         <textarea name="gachasoku_campaign_requirements" id="gachasoku_campaign_requirements" rows="5" class="large-text" placeholder="応募条件を入力してください。HTML可。"><?php echo esc_textarea($requirements); ?></textarea>
       </td>
     </tr>
+    <tr>
+      <th scope="row">倍率アップ</th>
+      <td>
+        <label class="gachasoku-campaign-meta__toggle">
+          <input type="checkbox" name="gachasoku_campaign_chance_up" value="1" <?php checked($chance_up); ?> />
+          <span>倍率アップ表示を有効にする</span>
+        </label>
+        <p class="description">チェックするとフロントに「倍率アップ」のバッジが表示されます。</p>
+      </td>
+    </tr>
+    <tr>
+      <th scope="row"><label for="gachasoku_campaign_chance_link">倍率アップ条件リンク</label></th>
+      <td>
+        <input type="url" name="gachasoku_campaign_chance_link" id="gachasoku_campaign_chance_link" class="regular-text" value="<?php echo esc_attr($chance_link); ?>" placeholder="https://" />
+        <p class="description">設定すると「倍率アップ条件を確認する」ボタンが表示されます。</p>
+      </td>
+    </tr>
+    <tr>
+      <th scope="row">現在の応募数</th>
+      <td>
+        <span class="gachasoku-campaign-meta__count"><strong><?php echo esc_html(number_format_i18n($entry_count)); ?></strong> 件</span>
+      </td>
+    </tr>
   </table>
   <?php
 }
@@ -895,6 +921,8 @@ function gachasoku_get_campaign_fields($campaign_id) {
     'end_datetime' => get_post_meta($campaign_id, '_gachasoku_campaign_end', true),
     'requirements' => get_post_meta($campaign_id, '_gachasoku_campaign_requirements', true),
     'max_winners' => get_post_meta($campaign_id, '_gachasoku_campaign_max_winners', true),
+    'chance_up' => get_post_meta($campaign_id, '_gachasoku_campaign_chance_up', true),
+    'chance_link' => get_post_meta($campaign_id, '_gachasoku_campaign_chance_link', true),
   ];
 }
 
@@ -918,6 +946,8 @@ function gachasoku_save_campaign_meta($post_id) {
   $end = isset($_POST['gachasoku_campaign_end']) ? sanitize_text_field($_POST['gachasoku_campaign_end']) : '';
   $requirements = isset($_POST['gachasoku_campaign_requirements']) ? wp_kses_post($_POST['gachasoku_campaign_requirements']) : '';
   $max_winners = isset($_POST['gachasoku_campaign_max_winners']) ? intval($_POST['gachasoku_campaign_max_winners']) : '';
+  $chance_up = isset($_POST['gachasoku_campaign_chance_up']) ? '1' : '';
+  $chance_link = isset($_POST['gachasoku_campaign_chance_link']) ? esc_url_raw($_POST['gachasoku_campaign_chance_link']) : '';
 
   update_post_meta($post_id, '_gachasoku_campaign_link', $link);
   update_post_meta($post_id, '_gachasoku_campaign_image_id', $image_id);
@@ -928,6 +958,18 @@ function gachasoku_save_campaign_meta($post_id) {
     update_post_meta($post_id, '_gachasoku_campaign_max_winners', $max_winners);
   } else {
     delete_post_meta($post_id, '_gachasoku_campaign_max_winners');
+  }
+
+  if ($chance_up) {
+    update_post_meta($post_id, '_gachasoku_campaign_chance_up', '1');
+  } else {
+    delete_post_meta($post_id, '_gachasoku_campaign_chance_up');
+  }
+
+  if (!empty($chance_link)) {
+    update_post_meta($post_id, '_gachasoku_campaign_chance_link', $chance_link);
+  } else {
+    delete_post_meta($post_id, '_gachasoku_campaign_chance_link');
   }
 }
 
@@ -1395,6 +1437,11 @@ function gachasoku_get_campaign_card_data($campaign_id) {
   $image = $fields['image_id'] ? wp_get_attachment_image_src($fields['image_id'], 'large') : null;
   $link = $fields['link'] ? gachasoku_apply_affiliate_url($fields['link']) : '';
 
+  $chance_link = $fields['chance_link'];
+  if (!is_string($chance_link)) {
+    $chance_link = '';
+  }
+
   return [
     'id' => $campaign_id,
     'title' => get_the_title($campaign_id),
@@ -1406,6 +1453,8 @@ function gachasoku_get_campaign_card_data($campaign_id) {
     'end' => $fields['end_datetime'],
     'requirements' => $fields['requirements'],
     'max_winners' => $fields['max_winners'],
+    'chance_up' => !empty($fields['chance_up']),
+    'chance_link' => $chance_link,
     'is_open' => gachasoku_is_campaign_open($campaign_id),
     'is_finished' => gachasoku_is_campaign_finished($campaign_id),
   ];
@@ -1478,6 +1527,21 @@ function gachasoku_render_campaign_cards($items, $args = []) {
       <?php endif; ?>
       <div class="gachasoku-campaign-card__body">
         <h3 class="gachasoku-campaign-card__title"><?php echo esc_html($card['title']); ?></h3>
+        <?php if (!empty($card['chance_up']) || !empty($card['chance_link'])) :
+          $boost_classes = ['gachasoku-campaign-card__boost'];
+          if (!empty($card['chance_up'])) {
+            $boost_classes[] = 'is-active';
+          }
+          ?>
+          <div class="<?php echo esc_attr(implode(' ', $boost_classes)); ?>">
+            <?php if (!empty($card['chance_up'])) : ?>
+              <span class="gachasoku-campaign-card__boost-label">倍率アップ</span>
+            <?php endif; ?>
+            <?php if (!empty($card['chance_link'])) : ?>
+              <a class="gachasoku-button gachasoku-button--ghost" href="<?php echo esc_url($card['chance_link']); ?>" target="_blank" rel="noopener noreferrer">倍率アップ条件を確認する</a>
+            <?php endif; ?>
+          </div>
+        <?php endif; ?>
         <div class="gachasoku-campaign-card__dates">
           <?php if (!empty($card['start'])) : ?>
             <span>開始：<?php echo esc_html(gachasoku_format_datetime($card['start'])); ?></span>

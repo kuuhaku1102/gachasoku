@@ -42,3 +42,27 @@
 .gachasoku-campaign-meta textarea {
   min-height: 120px;
 }
+
+.gachasoku-campaign-meta__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.gachasoku-campaign-meta__toggle input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+}
+
+.gachasoku-campaign-meta__count {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: #f1f5f9;
+  color: #0f172a;
+  font-size: 0.95rem;
+}
