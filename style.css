@@ -270,17 +270,78 @@ main {
   box-shadow: 0 6px 0 #bda000;
 }
 
-footer {
+.site-footer {
   background: var(--dark-gray);
   color: var(--white);
-  text-align: center;
   padding: 40px 20px;
   margin-top: 60px;
   font-size: 0.9rem;
 }
 
-footer p {
+.site-footer__inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+}
+
+.site-footer__nav {
+  width: 100%;
+}
+
+.site-footer__menu {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 16px 24px;
+}
+
+.site-footer__menu li {
+  margin: 0;
+}
+
+.site-footer__menu a {
+  color: rgba(255, 255, 255, 0.85);
+  text-decoration: none;
+  font-weight: 600;
+  transition: color 0.2s ease;
+}
+
+.site-footer__menu a:hover,
+.site-footer__menu a:focus {
+  color: var(--main-yellow);
+}
+
+.site-footer__meta {
+  text-align: center;
+}
+
+.site-footer__meta p {
   margin: 8px 0;
+}
+
+.site-footer__heart {
+  color: var(--main-yellow);
+}
+
+@media (min-width: 768px) {
+  .site-footer__inner {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: flex-start;
+  }
+
+  .site-footer__nav {
+    flex: 1 1 50%;
+  }
+
+  .site-footer__meta {
+    flex: 1 1 40%;
+    text-align: right;
+  }
 }
 
 .logo-wink {
