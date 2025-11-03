@@ -528,10 +528,6 @@ function gachasoku_render_ranking_list($entries = null, $args = []) {
   <div class="<?php echo esc_attr($wrapper_classes); ?>" data-ranking-slider>
     <?php if ($entry_count > 1) : ?>
       <button class="ranking-slider__nav ranking-slider__nav--prev" type="button" aria-label="前のランキング" data-slider-prev>&lsaquo;</button>
-      <div class="ranking-slider__hint" aria-hidden="true">
-        <span>スライドして読む</span>
-        <span>スライドして読む</span>
-      </div>
     <?php endif; ?>
     <div class="ranking-slider__viewport">
       <ol class="<?php echo esc_attr($args['list_class']); ?>" data-slider-track>
