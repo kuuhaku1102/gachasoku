@@ -464,6 +464,8 @@ main {
   width: 100%;
   max-width: 100%;
   box-sizing: border-box;
+  overflow: hidden;
+  padding: 0 48px;
 }
 
 .ranking-slider__viewport {
@@ -505,13 +507,13 @@ main {
 }
 
 .ranking-slider__nav--prev {
-  left: 0;
-  transform: translate(-50%, -50%);
+  left: 12px;
+  transform: translateY(-50%);
 }
 
 .ranking-slider__nav--next {
-  right: 0;
-  transform: translate(50%, -50%);
+  right: 12px;
+  transform: translateY(-50%);
 }
 
 .ranking-slider--static .ranking-slider__nav {
@@ -854,6 +856,10 @@ main {
 }
 
 @media (max-width: 1024px) {
+  .ranking-slider {
+    padding: 0;
+  }
+
   .ranking-slider__nav {
     display: none;
   }
