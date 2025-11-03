@@ -856,6 +856,33 @@ main {
   color: #777;
 }
 
+@media (min-width: 1025px) {
+  .ranking-slider {
+    padding: 0 64px;
+  }
+
+  .ranking-slider__viewport {
+    padding: 0;
+  }
+
+  .ranking-list {
+    gap: 24px;
+    padding: 16px 12px 32px;
+    scroll-padding: 24px;
+  }
+
+  .ranking-list__item {
+    flex: 0 0 calc((100% - 48px) / 3);
+    justify-content: center;
+  }
+
+  .ranking-card {
+    width: 40%;
+    min-width: 260px;
+    max-width: 360px;
+  }
+}
+
 @media (max-width: 1024px) {
   .ranking-slider {
     padding: 0;
