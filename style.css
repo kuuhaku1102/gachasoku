@@ -1939,6 +1939,7 @@ main {
 
   .ranking-slider {
     overflow: hidden;
+    padding: 0;
   }
 
   .ranking-slider__viewport {
@@ -1950,7 +1951,7 @@ main {
   }
 
   .ranking-list {
-    padding: 12px 4px 20px;
+    padding: 12px 0 20px;
     gap: 12px;
     display: flex;
     overflow-x: auto;
@@ -1959,7 +1960,7 @@ main {
   }
 
   .ranking-list__item {
-    flex: 0 0 calc(100% - 24px);
+    flex: 0 0 100%;
   }
 
   .oripa-index .section {
