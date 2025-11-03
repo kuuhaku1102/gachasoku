@@ -465,11 +465,13 @@ main {
   max-width: 100%;
   box-sizing: border-box;
   overflow: hidden;
+  padding: 0 24px;
   padding: 0 20px;
 }
 
 .ranking-slider__viewport {
   overflow: hidden;
+  padding: 0;
   padding: 0 4px;
   width: 100%;
   max-width: 100%;
@@ -527,6 +529,7 @@ main {
   padding: 12px 0 24px;
   margin: 0;
   display: flex;
+  gap: 16px;
   gap: 12px;
   overflow-x: auto;
   scroll-snap-type: x mandatory;
@@ -858,6 +861,7 @@ main {
 
 @media (min-width: 1025px) {
   .ranking-slider {
+    padding: 0 24px;
     padding: 0 32px;
   }
 
@@ -868,6 +872,7 @@ main {
   .ranking-list {
     gap: 16px;
     padding: 16px 0 32px;
+    scroll-padding: 0;
     scroll-padding: 16px;
     justify-content: flex-start;
   }
@@ -1653,7 +1658,7 @@ main {
 }
 
 .oripa-index .ranking-highlight .ranking-list {
-  gap: 28px;
+  gap: 16px;
 }
 
 .oripa-index .campaigns .gachasoku-campaigns {
