@@ -608,7 +608,7 @@ main {
 
 .ranking-card__main {
   display: grid;
-  grid-template-columns: minmax(120px, 0.85fr) minmax(0, 1fr);
+  grid-template-columns: 1fr;
   gap: 16px;
   align-items: start;
 }
