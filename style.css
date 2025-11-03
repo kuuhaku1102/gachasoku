@@ -869,17 +869,19 @@ main {
     gap: 24px;
     padding: 16px 12px 32px;
     scroll-padding: 24px;
+    justify-content: flex-start;
   }
 
   .ranking-list__item {
     flex: 0 0 calc((100% - 48px) / 3);
-    justify-content: center;
+    justify-content: flex-start;
   }
 
   .ranking-card {
-    width: 40%;
+    width: 100%;
     min-width: 260px;
     max-width: 360px;
+    margin: 0;
   }
 }
 
