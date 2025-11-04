@@ -174,6 +174,48 @@ function gachasoku_get_membership_page_url($slug) {
   return home_url('/' . $slug . '/');
 }
 
+function gachasoku_get_default_login_redirect_url() {
+  $dashboard = gachasoku_get_membership_page_url('member-dashboard');
+  if (!empty($dashboard)) {
+    return $dashboard;
+  }
+
+  return home_url('/');
+}
+
+function gachasoku_normalize_redirect_url($requested, $fallback) {
+  $requested = is_string($requested) ? trim($requested) : '';
+  $fallback = is_string($fallback) ? trim($fallback) : '';
+
+  if ($requested !== '') {
+    $validated = wp_validate_redirect($requested, '');
+    if ($validated !== '') {
+      return $validated;
+    }
+  }
+
+  if ($fallback === '') {
+    $fallback = home_url('/');
+  }
+
+  return wp_validate_redirect($fallback, home_url('/'));
+}
+
+function gachasoku_get_login_redirect_url($requested = '', $member = null) {
+  $default = gachasoku_get_default_login_redirect_url();
+  $redirect = gachasoku_normalize_redirect_url($requested, $default);
+
+  /**
+   * Filters the redirect destination after a successful member login.
+   *
+   * @param string     $redirect Normalized redirect URL.
+   * @param array|null $member   Member record for the authenticated user.
+   * @param string     $requested Raw redirect value supplied by the request.
+   * @param string     $default  Default redirect URL (member dashboard).
+   */
+  return apply_filters('gachasoku_member_login_redirect', $redirect, $member, $requested, $default);
+}
+
 function gachasoku_get_membership_link_items($context = 'default') {
   $links = [];
 
@@ -1403,6 +1445,16 @@ function gachasoku_handle_login() {
     return;
   }
 
+  $requested_redirect = isset($_POST['gachasoku_login_redirect']) ? wp_unslash($_POST['gachasoku_login_redirect']) : '';
+  $redirect_url = gachasoku_get_login_redirect_url($requested_redirect, $member);
+
+  if ($redirect_url && !headers_sent()) {
+    $redirected = wp_safe_redirect($redirect_url);
+    if ($redirected) {
+      exit;
+    }
+  }
+
   gachasoku_add_membership_message('login', 'success', 'ログインに成功しました。');
 }
 
@@ -2132,6 +2184,16 @@ function gachasoku_login_form_shortcode() {
     return '<p class="gachasoku-membership__notice">既にログイン済みです。</p>';
   }
 
+  $requested_redirect = '';
+  if (isset($_REQUEST['gachasoku_login_redirect'])) {
+    $requested_redirect = wp_unslash($_REQUEST['gachasoku_login_redirect']);
+  } elseif (isset($_REQUEST['redirect_to'])) {
+    $requested_redirect = wp_unslash($_REQUEST['redirect_to']);
+  }
+
+  $default_redirect = gachasoku_get_default_login_redirect_url();
+  $redirect_value = gachasoku_normalize_redirect_url($requested_redirect, $default_redirect);
+
   ob_start();
   echo gachasoku_render_membership_messages('login');
   ?>
@@ -2154,6 +2216,7 @@ function gachasoku_login_form_shortcode() {
     <div class="gachasoku-form__actions">
       <button type="submit" class="gachasoku-button">ログイン</button>
     </div>
+    <input type="hidden" name="gachasoku_login_redirect" value="<?php echo esc_url($redirect_value); ?>" />
     <input type="hidden" name="gachasoku_login_submit" value="1" />
   </form>
   <?php echo gachasoku_render_membership_links('login'); ?>
