@@ -608,7 +608,7 @@ function gachasoku_member_login($member, $remember = false) {
   $expires_timestamp = current_time('timestamp') + $lifetime;
   $expires = wp_date('Y-m-d H:i:s', $expires_timestamp);
 
-  $wpdb->insert(
+  $inserted = $wpdb->insert(
     $table,
     [
       'member_id' => intval($member['id']),
@@ -621,6 +621,13 @@ function gachasoku_member_login($member, $remember = false) {
     ],
     ['%d', '%s', '%s', '%s', '%d', '%s', '%s']
   );
+
+  if ($inserted === false) {
+    return new WP_Error(
+      'gachasoku_session_creation_failed',
+      'セッション情報を保存できませんでした。時間をおいて再度お試しください。'
+    );
+  }
 
   $expire_cookie = $expires_timestamp;
   if (!gachasoku_send_member_cookie($token, $expire_cookie)) {
@@ -717,11 +724,40 @@ function gachasoku_register_member_role() {
   );
 }
 
+function gachasoku_membership_tables_exist($force_refresh = false) {
+  global $wpdb;
+
+  static $exists = null;
+  if ($force_refresh) {
+    $exists = null;
+  }
+  if ($exists !== null) {
+    return $exists;
+  }
+
+  $required_tables = [
+    gachasoku_get_members_table(),
+    gachasoku_get_member_sessions_table(),
+  ];
+
+  foreach ($required_tables as $table) {
+    $like = $wpdb->esc_like($table);
+    $found = $wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $like));
+    if ($found !== $table) {
+      $exists = false;
+      return $exists;
+    }
+  }
+
+  $exists = true;
+  return $exists;
+}
+
 function gachasoku_install_membership_tables() {
   global $wpdb;
 
   $installed = get_option('gachasoku_membership_db_version');
-  if ($installed === GACHASOKU_MEMBERSHIP_DB_VERSION) {
+  if ($installed === GACHASOKU_MEMBERSHIP_DB_VERSION && gachasoku_membership_tables_exist()) {
     return;
   }
 
@@ -822,6 +858,8 @@ function gachasoku_install_membership_tables() {
   dbDelta($logs_sql);
   dbDelta($votes_sql);
   dbDelta($hits_sql);
+
+  gachasoku_membership_tables_exist(true);
 
   gachasoku_migrate_existing_wp_members();
 
@@ -1305,7 +1343,13 @@ function gachasoku_handle_registration() {
 
   $member = gachasoku_get_member_by_id($member_id);
   if ($member) {
-    if (!gachasoku_member_login($member)) {
+    $login_result = gachasoku_member_login($member);
+    if (is_wp_error($login_result)) {
+      gachasoku_add_membership_message('register', 'error', $login_result->get_error_message());
+      return;
+    }
+
+    if (!$login_result) {
       gachasoku_add_membership_message('register', 'error', 'セッション情報を保存できませんでした。ページを再読み込みしてから再度ログインしてください。');
       return;
     }
@@ -1349,7 +1393,13 @@ function gachasoku_handle_login() {
   }
 
   $remember = !empty($_POST['gachasoku_login_remember']);
-  if (!gachasoku_member_login($member, $remember)) {
+  $login_result = gachasoku_member_login($member, $remember);
+  if (is_wp_error($login_result)) {
+    gachasoku_add_membership_message('login', 'error', $login_result->get_error_message());
+    return;
+  }
+
+  if (!$login_result) {
     return;
   }
 
