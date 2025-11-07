@@ -29,6 +29,70 @@ body {
   line-height: 1.8;
 }
 
+.favorite-sites-form {
+  margin: 2rem 0;
+  padding: 1.5rem;
+  background: #ffffff;
+  border-radius: 8px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+}
+
+.favorite-sites-form .notice {
+  border-left: 4px solid transparent;
+  margin-bottom: 1rem;
+  padding: 0.75rem 1rem;
+  border-radius: 4px;
+}
+
+.favorite-sites-form .notice-success {
+  background: #edfdf4;
+  border-color: #34a853;
+  color: #256c3a;
+}
+
+.favorite-sites-form .notice-error {
+  background: #fff2f0;
+  border-color: #ea4335;
+  color: #8a1f16;
+}
+
+.favorite-sites-form .favorite-site-select {
+  margin-bottom: 1rem;
+}
+
+.favorite-sites-form label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+}
+
+.favorite-sites-form select {
+  width: 100%;
+  padding: 0.5rem;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background: #fff;
+}
+
+.favorite-sites-form .button[disabled] {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.favorite-sites-form .cooldown-message {
+  margin-bottom: 1rem;
+  color: #666;
+}
+
+.campaign-requirement-notice {
+  margin: 1.5rem 0;
+  padding: 1rem 1.25rem;
+  background: #fff7e6;
+  border-left: 4px solid #f9ab00;
+  border-radius: 4px;
+  color: #8c5a00;
+}
+
 .container {
   width: 90%;
   max-width: 1200px;
