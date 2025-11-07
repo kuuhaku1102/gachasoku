@@ -9,6 +9,45 @@ add_action('after_setup_theme', function() {
   register_nav_menus(['main-menu' => 'メインメニュー']);
 });
 
+/**
+ * Register the custom post type used to maintain ranking entries for 推しサイト.
+ */
+function gachasoku_register_ranking_site_post_type(): void {
+  $labels = [
+    'name'               => '推しサイト',
+    'singular_name'      => '推しサイト',
+    'menu_name'          => '推しサイト',
+    'add_new'            => '新規追加',
+    'add_new_item'       => '推しサイトを追加',
+    'edit_item'          => '推しサイトを編集',
+    'new_item'           => '新しい推しサイト',
+    'view_item'          => '推しサイトを表示',
+    'search_items'       => '推しサイトを検索',
+    'not_found'          => '推しサイトは登録されていません。',
+    'not_found_in_trash' => 'ゴミ箱に推しサイトはありません。',
+  ];
+
+  $args = [
+    'labels'             => $labels,
+    'public'             => false,
+    'show_ui'            => true,
+    'show_in_menu'       => true,
+    'show_in_admin_bar'  => true,
+    'show_in_nav_menus'  => false,
+    'show_in_rest'       => true,
+    'supports'           => ['title', 'editor', 'thumbnail'],
+    'capability_type'    => 'post',
+    'map_meta_cap'       => true,
+    'has_archive'        => false,
+    'rewrite'            => false,
+    'menu_icon'          => 'dashicons-thumbs-up',
+    'menu_position'      => 20,
+  ];
+
+  register_post_type('ranking_site', $args);
+}
+add_action('init', 'gachasoku_register_ranking_site_post_type');
+
 add_action('wp_enqueue_scripts', function() {
   wp_enqueue_style('yellowsmile-style', get_stylesheet_uri());
 });
@@ -248,18 +287,33 @@ function gachasoku_is_mypage($page = null): bool {
   $page_slug = $page->post_name ?? '';
   $page_title = wp_strip_all_tags($page->post_title ?? '');
 
-  $target_slugs = (array) apply_filters('gachasoku_mypage_slugs', ['mypage', 'my-page']);
+  $target_ids = array_filter(array_map('absint', (array) apply_filters('gachasoku_mypage_ids', [])));
+  if (!empty($target_ids) && in_array((int) $page->ID, $target_ids, true)) {
+    return true;
+  }
+
+  $target_slugs = (array) apply_filters('gachasoku_mypage_slugs', ['mypage', 'my-page', 'my_page', 'member', 'members']);
   $normalized_slugs = array_filter(array_map('sanitize_title', $target_slugs));
 
   if ($page_slug && in_array($page_slug, $target_slugs, true)) {
     return true;
   }
 
-  if ($page_slug && in_array(sanitize_title($page_slug), $normalized_slugs, true)) {
+  $sanitized_slug = sanitize_title($page_slug);
+  if ($sanitized_slug && in_array($sanitized_slug, $normalized_slugs, true)) {
     return true;
   }
 
-  $target_titles = (array) apply_filters('gachasoku_mypage_titles', ['マイページ']);
+  if ($sanitized_slug && false !== strpos($sanitized_slug, 'mypage')) {
+    return true;
+  }
+
+  $template = get_page_template_slug($page->ID);
+  if ($template && false !== strpos($template, 'mypage')) {
+    return true;
+  }
+
+  $target_titles = (array) apply_filters('gachasoku_mypage_titles', ['マイページ', '会員ページ']);
   foreach ($target_titles as $target_title) {
     if ($target_title !== '' && $page_title === wp_strip_all_tags($target_title)) {
       return true;
@@ -418,19 +472,34 @@ add_filter('gachasoku_campaign_user_can_enter', 'gachasoku_filter_campaign_entry
 /**
  * Register campaign meta boxes for favourite site restrictions.
  */
+function gachasoku_get_campaign_post_types(): array {
+  $post_types = (array) apply_filters('gachasoku_campaign_post_types', ['campaign', 'present', 'lottery', 'raffle']);
+  $post_types = array_map('sanitize_key', $post_types);
+  $post_types = array_filter($post_types);
+
+  return array_values(array_unique($post_types));
+}
+
 function gachasoku_register_campaign_meta_box(): void {
-  if (!post_type_exists('campaign')) {
+  $post_types = gachasoku_get_campaign_post_types();
+  if (empty($post_types)) {
     return;
   }
 
-  add_meta_box(
-    'gachasoku_campaign_favorite_sites',
-    '推しサイト制限',
-    'gachasoku_render_campaign_meta_box',
-    'campaign',
-    'side',
-    'high'
-  );
+  foreach ($post_types as $post_type) {
+    if (!post_type_exists($post_type)) {
+      continue;
+    }
+
+    add_meta_box(
+      'gachasoku_campaign_favorite_sites',
+      '推しサイト制限',
+      'gachasoku_render_campaign_meta_box',
+      $post_type,
+      'side',
+      'high'
+    );
+  }
 }
 add_action('add_meta_boxes', 'gachasoku_register_campaign_meta_box');
 
@@ -469,7 +538,10 @@ function gachasoku_render_campaign_meta_box($post): void {
  * @param int $post_id
  */
 function gachasoku_save_campaign_meta(int $post_id): void {
-  if (!post_type_exists('campaign')) {
+  $post_type = get_post_type($post_id);
+  $allowed_post_types = gachasoku_get_campaign_post_types();
+
+  if (!$post_type || !in_array($post_type, $allowed_post_types, true)) {
     return;
   }
 
@@ -477,7 +549,7 @@ function gachasoku_save_campaign_meta(int $post_id): void {
     return;
   }
 
-  if (!isset($_POST['post_type']) || 'campaign' !== $_POST['post_type']) {
+  if (!isset($_POST['post_type']) || $post_type !== $_POST['post_type']) {
     return;
   }
 
