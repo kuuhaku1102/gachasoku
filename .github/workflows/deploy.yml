@@ -1,4 +1,4 @@
-name: Deploy to ConoHa WING
+name: Deploy YellowSmile Theme to ConoHa WING
 
 on:
   push:
@@ -21,7 +21,7 @@ jobs:
           chmod 600 ~/.ssh/id_ed25519
           ssh-keyscan -p 8022 -H www1012.conoha.ne.jp >> ~/.ssh/known_hosts
 
-      - name: Deploy via rsync (差分アップロード)
+      - name: Deploy WordPress Theme (差分のみアップロード)
         run: |
           rsync -avz --delete \
             --exclude=".git/" \
@@ -29,5 +29,5 @@ jobs:
             --exclude="README.md" \
             --exclude="*.yml" \
             -e "ssh -p 8022 -i ~/.ssh/id_ed25519" \
-            ./ \
-            c3659606@www1012.conoha.ne.jp:/home/c3659606/public_html/online-gacha-hack.com/
+            ./wp-content/themes/yellowsmile_complete/ \
+            c3659606@www1012.conoha.ne.jp:/home/c3659606/public_html/online-gacha-hack.com/wp-content/themes/yellowsmile_complete/
