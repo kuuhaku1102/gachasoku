@@ -771,7 +771,8 @@ function gachasoku_send_member_cookie($value, $expire_timestamp) {
     return false;
   }
 
-  $secure = is_ssl();
+  $home_scheme = wp_parse_url(home_url('/'), PHP_URL_SCHEME);
+  $secure = is_ssl() && $home_scheme === 'https';
   setcookie(GACHASOKU_MEMBER_SESSION_COOKIE, $value, $expire_timestamp, COOKIEPATH, COOKIE_DOMAIN, $secure, true);
   if (COOKIEPATH !== SITECOOKIEPATH) {
     setcookie(GACHASOKU_MEMBER_SESSION_COOKIE, $value, $expire_timestamp, SITECOOKIEPATH, COOKIE_DOMAIN, $secure, true);
