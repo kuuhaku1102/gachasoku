@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - main  # ← mainブランチにpushしたら自動デプロイ
-  workflow_dispatch: # 手動実行も可能
+  workflow_dispatch:  # 手動実行も可能
 
 jobs:
   deploy:
@@ -21,7 +21,7 @@ jobs:
           chmod 600 ~/.ssh/id_ed25519
           ssh-keyscan -p 8022 -H www1012.conoha.ne.jp >> ~/.ssh/known_hosts
 
-      - name: Deploy WordPress Theme (差分のみアップロード)
+      - name: Deploy YellowSmile Theme (差分のみアップロード)
         run: |
           rsync -avz --delete \
             --exclude=".git/" \
@@ -29,5 +29,5 @@ jobs:
             --exclude="README.md" \
             --exclude="*.yml" \
             -e "ssh -p 8022 -i ~/.ssh/id_ed25519" \
-            ./wp-content/themes/yellowsmile_complete/ \
+            ./ \
             c3659606@www1012.conoha.ne.jp:/home/c3659606/public_html/online-gacha-hack.com/wp-content/themes/yellowsmile_complete/
