@@ -1,0 +1,57 @@
+#gachasoku-ranking-entries {
+  margin-top: 20px;
+}
+
+.gachasoku-ranking-entry {
+  background: #fff;
+  border: 1px solid #dcdcdc;
+  padding: 20px;
+  margin-bottom: 20px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.gachasoku-ranking-entry h2 {
+  margin-top: 0;
+  font-size: 18px;
+}
+
+.gachasoku-ranking-fields label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 12px;
+}
+
+.gachasoku-ranking-fields input[type="text"],
+.gachasoku-ranking-fields input[type="url"],
+.gachasoku-ranking-fields textarea {
+  width: 100%;
+  margin-top: 6px;
+}
+
+.gachasoku-media-field {
+  display: flex;
+  gap: 8px;
+}
+
+.gachasoku-media-field input {
+  flex: 1;
+}
+
+.gachasoku-ranking-buttons {
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.gachasoku-ranking-buttons > div {
+  flex: 1 1 220px;
+}
+
+.gachasoku-remove-entry {
+  color: #a00;
+  margin-top: 10px;
+}
+
+.gachasoku-remove-entry:hover {
+  color: #dc3232;
+}
