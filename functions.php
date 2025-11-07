@@ -287,8 +287,9 @@ function gachasoku_is_mypage($page = null) {
     return false;
   }
 
-  $page_slug = $page->post_name ?? '';
-  $page_title = wp_strip_all_tags($page->post_title ?? '');
+  $page_slug = isset($page->post_name) ? $page->post_name : '';
+  $page_title_raw = isset($page->post_title) ? $page->post_title : '';
+  $page_title = wp_strip_all_tags($page_title_raw);
 
   $target_ids = array_filter(array_map('absint', (array) apply_filters('gachasoku_mypage_ids', [])));
   if (!empty($target_ids) && in_array((int) $page->ID, $target_ids, true)) {
@@ -366,7 +367,7 @@ function gachasoku_render_favorite_sites_form() {
   $output .= '<input type="hidden" name="gachasoku_favorite_sites_action" value="1" />';
 
   for ($i = 0; $i < 2; $i++) {
-    $selected = $current[$i] ?? 0;
+    $selected = isset($current[$i]) ? $current[$i] : 0;
     $output .= '<div class="favorite-site-select">';
     $output .= sprintf('<label for="gachasoku-favorite-site-%1$d">推しサイト%2$d</label>', $i + 1, $i + 1);
     $output .= sprintf('<select name="gachasoku_favorite_sites[]" id="gachasoku-favorite-site-%1$d" %2$s>', $i + 1, $cooldown['allowed'] ? '' : 'disabled');
