@@ -3,150 +3,234 @@ Theme Name: YellowSmile
 Theme URI: https://example.com/
 Author: InfinityDesign
 Author URI: https://www.infinitydesign.jp/
-Description: ビジネスライクでありながら、少しユーモアのある黄色基調のWordPressテーマ。
-Version: 1.1
+Description: シンプルなブログやメディアサイト向けの軽量なWordPressテーマ。
+Version: 1.0
 License: GNU General Public License v2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 Text Domain: yellowsmile
 */
 
-:root {
-  --main-yellow: #ffde59;
-  --accent-yellow: #ffd633;
-  --dark-gray: #2a2a2a;
-  --light-gray: #f8f8f8;
-  --white: #ffffff;
-  --text-color: #333;
-  --link-color: #d6a600;
-  --transition: all 0.3s ease;
-}
-
 body {
   font-family: "Noto Sans JP", sans-serif;
-  background: var(--light-gray);
-  color: var(--text-color);
+  background: #f5f5f5;
+  color: #333;
   margin: 0;
-  line-height: 1.8;
+  line-height: 1.7;
+}
+
+a {
+  color: #0073aa;
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+a:hover,
+a:focus {
+  color: #005177;
 }
 
 .container {
-  width: 90%;
-  max-width: 1200px;
+  width: min(92%, 960px);
   margin: 0 auto;
 }
 
-header {
-  background-color: var(--main-yellow);
-  padding: 25px 0 10px;
-  box-shadow: 0 4px 8px rgba(0,0,0,0.08);
-  position: sticky;
-  top: 0;
-  z-index: 1000;
+.site-header {
+  background: #fff;
+  border-bottom: 1px solid #e3e3e3;
+  padding: 32px 0;
+}
+
+.site-branding {
   text-align: center;
 }
 
-header h1 {
-  font-size: 2rem;
+.site-title {
   margin: 0;
-  letter-spacing: 0.03em;
+  font-size: 2rem;
+  letter-spacing: 0.04em;
 }
 
-header a {
-  color: var(--dark-gray);
-  text-decoration: none;
+.site-title a {
+  color: inherit;
 }
 
-nav ul {
-  list-style: none;
+.site-description {
+  margin: 0.75rem 0 0;
+  color: #666;
+  font-size: 0.95rem;
+}
+
+.site-navigation {
+  margin-top: 1.5rem;
+}
+
+.site-navigation .menu {
   display: flex;
   justify-content: center;
-  gap: 24px;
-  margin: 20px 0 0;
-  padding: 0;
   flex-wrap: wrap;
+  gap: 1.2rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
 }
 
-nav a {
-  color: var(--dark-gray);
-  text-decoration: none;
+.site-navigation .menu a {
+  color: #333;
   font-weight: 600;
-  position: relative;
-  transition: var(--transition);
 }
 
-nav a:hover {
-  color: var(--link-color);
+.site-navigation .menu a:hover,
+.site-navigation .menu a:focus {
+  color: #0073aa;
 }
 
-main {
-  background: var(--white);
-  border-radius: 16px;
-  box-shadow: 0 4px 15px rgba(0,0,0,0.05);
-  padding: 50px 30px;
-  margin-top: 40px;
+.site-main {
+  padding: 48px 0;
 }
 
-.section-title {
-  font-size: 1.8rem;
-  border-left: 6px solid var(--accent-yellow);
-  padding-left: 12px;
-  margin-bottom: 25px;
+.post-card,
+.single-post,
+.page-content {
+  background: #fff;
+  border: 1px solid #e3e3e3;
+  border-radius: 8px;
+  padding: 28px;
+  margin-bottom: 32px;
 }
 
-.card {
-  background: var(--white);
-  border-radius: 12px;
-  box-shadow: 0 3px 10px rgba(0,0,0,0.08);
-  padding: 25px;
-  margin-bottom: 30px;
-  transition: var(--transition);
+.post-card .entry-title,
+.single-post .entry-title,
+.page-content .entry-title {
+  margin: 0 0 0.75rem;
+  font-size: 1.6rem;
 }
 
-.card:hover {
-  transform: translateY(-5px);
-  box-shadow: 0 6px 16px rgba(0,0,0,0.12);
+.post-card .entry-date,
+.single-post .entry-meta {
+  color: #888;
+  font-size: 0.9rem;
+  margin-bottom: 1.2rem;
 }
 
-.button {
+.post-thumbnail {
+  margin-bottom: 1.25rem;
+}
+
+.post-thumbnail img {
+  width: 100%;
+  height: auto;
+  border-radius: 6px;
+}
+
+.entry-summary p {
+  margin-top: 0;
+}
+
+.read-more {
   display: inline-block;
-  background: var(--main-yellow);
-  color: var(--dark-gray);
-  font-weight: 700;
-  padding: 12px 30px;
-  border-radius: 50px;
-  box-shadow: 0 4px 0 #dcbf00;
-  transition: var(--transition);
-  text-decoration: none;
+  margin-top: 1.2rem;
+  font-weight: 600;
 }
 
-.button:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 6px 0 #bda000;
+.read-more::after {
+  content: " →";
 }
 
-footer {
-  background: var(--dark-gray);
-  color: var(--white);
+.no-posts {
   text-align: center;
-  padding: 40px 20px;
-  margin-top: 60px;
+  color: #666;
+}
+
+.archive-header {
+  text-align: center;
+  margin-bottom: 2.5rem;
+}
+
+.archive-title {
+  font-size: 1.8rem;
+  margin: 0;
+}
+
+.archive-description {
+  margin-top: 0.75rem;
+  color: #666;
+}
+
+.entry-content > * {
+  margin-bottom: 1.6rem;
+}
+
+.entry-content img,
+.entry-content iframe {
+  max-width: 100%;
+  height: auto;
+}
+
+.entry-footer {
+  margin-top: 2rem;
+  color: #666;
   font-size: 0.9rem;
 }
 
-footer p {
-  margin: 8px 0;
-}
-
-.logo-wink {
+.tag-links a {
   display: inline-block;
-  animation: wink 2.5s infinite ease-in-out;
-}
-@keyframes wink {
-  0%, 90%, 100% { transform: rotate(0deg); }
-  95% { transform: rotate(-8deg); }
+  background: #f0f8ff;
+  color: #005177;
+  padding: 0.25rem 0.75rem;
+  border-radius: 999px;
+  margin-right: 0.5rem;
+  margin-bottom: 0.5rem;
+  font-size: 0.85rem;
 }
 
-@media (max-width: 768px) {
-  nav ul { flex-direction: column; gap: 12px; }
-  main { padding: 30px 15px; }
+.post-navigation {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  margin: 3rem 0;
+}
+
+.post-navigation a {
+  color: #0073aa;
+  font-weight: 600;
+}
+
+.post-navigation a:hover,
+.post-navigation a:focus {
+  color: #005177;
+}
+
+.comments-area {
+  background: #fff;
+  border: 1px solid #e3e3e3;
+  border-radius: 8px;
+  padding: 28px;
+}
+
+.site-footer {
+  background: #fff;
+  border-top: 1px solid #e3e3e3;
+  padding: 32px 0;
+  text-align: center;
+  color: #777;
+  font-size: 0.9rem;
+}
+
+@media (max-width: 640px) {
+  .site-header {
+    padding: 24px 0;
+  }
+
+  .post-card,
+  .single-post,
+  .page-content,
+  .comments-area {
+    padding: 22px;
+  }
+
+  .post-card .entry-title,
+  .single-post .entry-title,
+  .page-content .entry-title {
+    font-size: 1.4rem;
+  }
 }
