@@ -1,0 +1,61 @@
+.gachasoku-calendar-admin {
+  max-width: 900px;
+}
+
+.gachasoku-calendar-entries {
+  margin-top: 20px;
+}
+
+.gachasoku-calendar-entry {
+  background: #fff;
+  border: 1px solid #ccd0d4;
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+.gachasoku-calendar-entry h2 {
+  margin-top: 0;
+  font-size: 16px;
+}
+
+.gachasoku-calendar-entry__fields > label {
+  display: block;
+  margin-bottom: 15px;
+}
+
+.gachasoku-calendar-entry__fields input[type="text"],
+.gachasoku-calendar-entry__fields input[type="url"],
+.gachasoku-calendar-entry__fields input[type="date"],
+.gachasoku-calendar-entry__fields input[type="number"],
+.gachasoku-calendar-entry__fields select,
+.gachasoku-calendar-entry__fields textarea {
+  width: 100%;
+  max-width: 100%;
+}
+
+.gachasoku-calendar-entry__fields textarea {
+  height: 90px;
+}
+
+.gachasoku-calendar-dates {
+  display: none;
+}
+
+.gachasoku-calendar-entry .button-link-delete {
+  margin-top: 10px;
+}
+
+.gachasoku-calendar-copy {
+  display: grid;
+  gap: 10px;
+}
+
+.gachasoku-calendar-copy__textarea {
+  width: 100%;
+  min-height: 120px;
+}
+
+.gachasoku-calendar-copy__today {
+  font-weight: 600;
+  margin: 0;
+}

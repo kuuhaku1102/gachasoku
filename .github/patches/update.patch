@@ -1,0 +1,353 @@
+diff --git a/page-oripa-index.php b/page-oripa-index.php
+new file mode 100644
+index 0000000000000000000000000000000000000000..58a33947338031231bf32d276078aa80b7a01f7d
+--- /dev/null
++++ b/page-oripa-index.php
+@@ -0,0 +1,95 @@
++<?php
++/* Template Name: オンラインオリパまとめ - Index */
++get_header();
++?>
++
++<main class="oripa-index">
++  <section class="hero">
++    <div class="container">
++      <h1>【2025年最新版】オンラインオリパ・ガチャサイトまとめ</h1>
++      <p>
++        ポケカ・遊戯王・ワンピースなど人気トレカの最新オンラインオリパ情報を毎日更新！
++        当サイトでは信頼できるオリパ販売サイトを徹底比較し、初心者でも安心して楽しめるガチャを紹介しています。
++      </p>
++      <a href="#latest" class="btn-primary">最新ガチャを見る</a>
++    </div>
++  </section>
++
++  <section id="latest" class="latest-oripa section">
++    <div class="container">
++      <h2>🎯 オリパ最新ガチャ情報</h2>
++      <p>最新のオンラインオリパガチャ一覧を毎日更新！人気・限定イベント・高還元オリパを見逃すな！</p>
++      <?php echo do_shortcode('[oripa_list]'); ?>
++    </div>
++  </section>
++
++  <section id="calendar" class="calendar section">
++    <div class="container">
++      <h2>📅 オリパイベントカレンダー</h2>
++      <p>各サイトで開催されるキャンペーン・特別ガチャ・限定BOX情報をカレンダー形式でチェック！</p>
++      <?php echo do_shortcode('[gachasoku_calendar]'); ?>
++    </div>
++  </section>
++
++  <section class="popular-sites section">
++    <div class="container">
++      <h2>🏆 人気オンラインオリパサイト一覧</h2>
++      <ul class="site-list">
++        <li><a href="/oripaone/">オリパワン（OripaOne）</a> – 高還元率で人気！</li>
++        <li><a href="/oripadash/">オリパダッシュ（OripaDash）</a> – 高速更新＋即時在庫反映！</li>
++        <li><a href="/orikuji/">おりくじ</a> – コイン制ガチャの定番！</li>
++        <li><a href="/dopa/">DOPA-GAME</a> – イベント連動ガチャで注目！</li>
++      </ul>
++      <p>各サイトの特徴や評判を比較したい方は → <a href="/comparison/">オンラインオリパ比較表</a></p>
++    </div>
++  </section>
++
++  <section class="about section">
++    <div class="container">
++      <h2>💡 オンラインオリパとは？</h2>
++      <p>
++        「オンラインオリパ」は、実店舗で販売されていた「オリジナルパック」をネット上で楽しめるサービスです。
++        トレカファンが気軽にレアカードを狙える仕組みとして急速に普及しています。
++      </p>
++      <h3>🔍 オンラインオリパが人気の理由</h3>
++      <ul>
++        <li>抽選結果がすぐに分かるリアルタイム感</li>
++        <li>限定イベント・コラボなど多彩なガチャ企画</li>
++        <li>在庫・排出率が明確で安心</li>
++      </ul>
++    </div>
++  </section>
++
++  <section class="faq section">
++    <div class="container">
++      <h2>🙋‍♀️ よくある質問（FAQ）</h2>
++      <dl>
++        <dt>Q. オンラインオリパは違法じゃないの？</dt>
++        <dd>各サイトは古物商許可を取得し、景品表示法に準拠して運営されています。</dd>
++        <dt>Q. 高額カードは本当に当たりますか？</dt>
++        <dd>在庫・当選履歴が公開されており、透明性が高いサイトを選ぶのがポイントです。</dd>
++        <dt>Q. 支払い方法は？</dt>
++        <dd>クレジットカード・PayPay・コンビニ払いなど各種対応。詳細は各公式サイトで確認。</dd>
++      </dl>
++    </div>
++  </section>
++
++  <section class="comparison section">
++    <div class="container">
++      <h2>⚖️ オンラインオリパ比較表</h2>
++      <table class="comparison-table">
++        <thead>
++          <tr><th>サイト名</th><th>特徴</th><th>還元率</th><th>取扱シリーズ</th></tr>
++        </thead>
++        <tbody>
++          <tr><td>オリパワン</td><td>初心者に人気</td><td>約85%</td><td>ポケカ・ワンピース</td></tr>
++          <tr><td>オリパダッシュ</td><td>更新頻度が高い</td><td>約90%</td><td>遊戯王・ポケカ</td></tr>
++          <tr><td>おりくじ</td><td>低価格帯中心</td><td>約80%</td><td>ポケカ・MTG</td></tr>
++          <tr><td>DOPA</td><td>イベント特化型</td><td>約88%</td><td>ポケカ</td></tr>
++        </tbody>
++      </table>
++    </div>
++  </section>
++</main>
++
++<?php get_footer(); ?>
+diff --git a/style.css b/style.css
+index 027eb2d0a92011ce03676fd7a7d5fe2767e8ad3f..5619eb2d4f49ced4929347f112b865bd4ac1eb7d 100644
+--- a/style.css
++++ b/style.css
+@@ -594,25 +594,247 @@ footer p {
+ 
+ .gachasoku-calendar__pickup-button:hover,
+ .gachasoku-calendar__pickup-button:focus {
+   background: #1d4ed8;
+   color: #fff;
+ }
+ 
+ .gachasoku-calendar__pickup-button--static {
+   background: #e2e8f0;
+   color: #1f2937;
+ }
+ 
+ @media (max-width: 768px) {
+   .gachasoku-calendar {
+     padding: 16px;
+   }
+ 
+   .gachasoku-calendar__row {
+     gap: 4px;
+   }
+ 
+   .gachasoku-calendar__cell {
+     padding: 10px;
+   }
+ }
++
++
++/* Oripa index page */
++main.oripa-index {
++  display: grid;
++  gap: 64px;
++}
++
++.oripa-index .hero {
++  background: linear-gradient(135deg, rgba(255, 222, 89, 0.25), rgba(255, 214, 51, 0.45));
++  border-radius: 16px;
++  padding: 60px 30px;
++  text-align: center;
++  position: relative;
++  overflow: hidden;
++}
++
++.oripa-index .hero::after {
++  content: "";
++  position: absolute;
++  inset: 0;
++  background: radial-gradient(circle at top right, rgba(255, 173, 59, 0.35), transparent 55%),
++              radial-gradient(circle at bottom left, rgba(255, 222, 89, 0.45), transparent 60%);
++  pointer-events: none;
++}
++
++.oripa-index .hero .container {
++  position: relative;
++  z-index: 1;
++  display: grid;
++  gap: 24px;
++  justify-items: center;
++}
++
++.oripa-index .hero h1 {
++  font-size: 2.4rem;
++  margin: 0;
++  color: var(--dark-gray);
++}
++
++.oripa-index .hero p {
++  max-width: 720px;
++  margin: 0 auto;
++  font-size: 1.1rem;
++}
++
++.oripa-index .btn-primary {
++  display: inline-flex;
++  align-items: center;
++  justify-content: center;
++  padding: 14px 36px;
++  border-radius: 999px;
++  background: #ffb84d;
++  color: var(--dark-gray);
++  font-weight: 700;
++  text-decoration: none;
++  box-shadow: 0 10px 20px rgba(255, 173, 59, 0.35);
++  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
++}
++
++.oripa-index .btn-primary:hover,
++.oripa-index .btn-primary:focus {
++  background: #ff9a1f;
++  transform: translateY(-3px);
++  box-shadow: 0 14px 28px rgba(255, 154, 31, 0.35);
++  color: var(--dark-gray);
++}
++
++.oripa-index .section .container {
++  display: grid;
++  gap: 20px;
++}
++
++.oripa-index .section h2 {
++  font-size: 2rem;
++  margin: 0;
++}
++
++.oripa-index .latest-oripa,
++.oripa-index .calendar,
++.oripa-index .popular-sites,
++.oripa-index .about,
++.oripa-index .faq,
++.oripa-index .comparison {
++  background: #fafafa;
++  border-radius: 16px;
++  padding: 40px 30px;
++}
++
++.oripa-index .section p {
++  margin: 0;
++  color: #444;
++}
++
++.oripa-index .site-list {
++  list-style: none;
++  margin: 0;
++  padding: 0;
++  display: grid;
++  gap: 12px;
++}
++
++.oripa-index .site-list li {
++  background: #fff;
++  border-radius: 12px;
++  padding: 14px 18px;
++  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.05);
++  font-weight: 600;
++}
++
++.oripa-index .site-list a {
++  color: var(--link-color);
++  font-weight: 700;
++  text-decoration: none;
++}
++
++.oripa-index .site-list a:hover {
++  text-decoration: underline;
++}
++
++.oripa-index .about ul {
++  margin: 0;
++  padding-left: 1.2em;
++  display: grid;
++  gap: 8px;
++}
++
++.oripa-index .faq dl {
++  margin: 0;
++  display: grid;
++  gap: 16px;
++}
++
++.oripa-index .faq dt {
++  font-weight: 700;
++  color: #444;
++}
++
++.oripa-index .faq dd {
++  margin: 0;
++  padding-left: 1em;
++  color: #555;
++}
++
++.oripa-index .comparison-table {
++  width: 100%;
++  border-collapse: collapse;
++  background: #fff;
++  border-radius: 16px;
++  overflow: hidden;
++  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.06);
++}
++
++.oripa-index .comparison-table th,
++.oripa-index .comparison-table td {
++  padding: 16px 18px;
++  text-align: left;
++  border-bottom: 1px solid #ececec;
++}
++
++.oripa-index .comparison-table thead th {
++  background: var(--main-yellow);
++  color: var(--dark-gray);
++  font-size: 0.95rem;
++}
++
++.oripa-index .comparison-table tbody tr:nth-child(odd) {
++  background: #fffdf5;
++}
++
++.oripa-index .comparison-table tbody tr:nth-child(even) {
++  background: #fff;
++}
++
++@media (max-width: 899px) {
++  .oripa-index .hero {
++    padding: 48px 24px;
++  }
++
++  .oripa-index .hero h1 {
++    font-size: 2rem;
++  }
++
++  .oripa-index .section h2 {
++    font-size: 1.75rem;
++  }
++}
++
++@media (max-width: 599px) {
++  main.oripa-index {
++    gap: 48px;
++  }
++
++  .oripa-index .hero {
++    padding: 40px 20px;
++  }
++
++  .oripa-index .hero p {
++    font-size: 1rem;
++  }
++
++  .oripa-index .latest-oripa,
++  .oripa-index .calendar,
++  .oripa-index .popular-sites,
++  .oripa-index .about,
++  .oripa-index .faq,
++  .oripa-index .comparison {
++    padding: 32px 20px;
++  }
++
++  .oripa-index .comparison-table th,
++  .oripa-index .comparison-table td {
++    padding: 12px;
++    font-size: 0.9rem;
++  }
++
++  .oripa-index .comparison-table {
++    display: block;
++    overflow-x: auto;
++    white-space: nowrap;
++  }
++}
