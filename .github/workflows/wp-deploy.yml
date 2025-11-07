@@ -21,9 +21,13 @@ jobs:
           chmod 600 ~/.ssh/id_ed25519
           ssh-keyscan -p 8022 -H www1012.conoha.ne.jp >> ~/.ssh/known_hosts
 
-      - name: Deploy WordPress theme via rsync
+      - name: Deploy WordPress theme via rsync (safe mode)
         run: |
-          rsync -avz --delete \
-          ./ \
-          c3659606@www1012.conoha.ne.jp:/home/c3659606/public_html/online-gacha-hack.com/wp-content/themes/yellowsmile_complete/ \
-          -e "ssh -p 8022 -i ~/.ssh/id_ed25519"
+          rsync -avz \
+            --exclude=".git/" \
+            --exclude=".github/" \
+            --exclude="README.md" \
+            --exclude="*.yml" \
+            -e "ssh -p 8022 -i ~/.ssh/id_ed25519" \
+            ./ \
+            c3659606@www1012.conoha.ne.jp:/home/c3659606/public_html/online-gacha-hack.com/wp-content/themes/yellowsmile_complete/
