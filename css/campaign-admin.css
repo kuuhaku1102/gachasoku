@@ -66,3 +66,18 @@
   color: #0f172a;
   font-size: 0.95rem;
 }
+
+.gachasoku-campaign-meta__favorites {
+  display: grid;
+  gap: 8px 18px;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  margin: 8px 0 4px;
+}
+
+.gachasoku-campaign-meta__favorite {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  color: #0f172a;
+}
