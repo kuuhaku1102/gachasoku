@@ -12,7 +12,7 @@ add_action('after_setup_theme', function() {
 /**
  * Register the custom post type used to maintain ranking entries for 推しサイト.
  */
-function gachasoku_register_ranking_site_post_type(): void {
+function gachasoku_register_ranking_site_post_type() {
   $labels = [
     'name'               => '推しサイト',
     'singular_name'      => '推しサイト',
@@ -57,7 +57,7 @@ add_action('wp_enqueue_scripts', function() {
  *
  * @return array<int,string> Keyed by post ID with the display label as the value.
  */
-function gachasoku_get_ranking_site_options(): array {
+function gachasoku_get_ranking_site_options() {
   $options = apply_filters('gachasoku_ranking_site_options', null);
   if (is_array($options)) {
     return array_map('wp_strip_all_tags', $options);
@@ -113,7 +113,7 @@ function gachasoku_get_ranking_site_options(): array {
  * @param int $user_id Optional. Defaults to the current user.
  * @return int[]
  */
-function gachasoku_get_user_favorite_sites(int $user_id = 0): array {
+function gachasoku_get_user_favorite_sites($user_id = 0) {
   $user_id = $user_id ?: get_current_user_id();
   if (!$user_id) {
     return [];
@@ -133,7 +133,7 @@ function gachasoku_get_user_favorite_sites(int $user_id = 0): array {
  * @param int $user_id Optional. Defaults to the current user.
  * @return array{allowed:bool,remaining:int}
  */
-function gachasoku_user_can_update_favorite_sites(int $user_id = 0): array {
+function gachasoku_user_can_update_favorite_sites($user_id = 0) {
   $user_id = $user_id ?: get_current_user_id();
   if (!$user_id) {
     return ['allowed' => false, 'remaining' => 0];
@@ -160,7 +160,10 @@ function gachasoku_user_can_update_favorite_sites(int $user_id = 0): array {
  * @param int[] $site_ids
  * @return void
  */
-function gachasoku_set_user_favorite_sites(int $user_id, array $site_ids): void {
+function gachasoku_set_user_favorite_sites($user_id, $site_ids) {
+  if (!is_array($site_ids)) {
+    $site_ids = [];
+  }
   $site_ids = array_values(array_unique(array_map('absint', $site_ids)));
   $site_ids = array_slice($site_ids, 0, 2);
 
@@ -176,7 +179,7 @@ function gachasoku_set_user_favorite_sites(int $user_id, array $site_ids): void 
  * @param string $message
  * @return void
  */
-function gachasoku_set_favorite_sites_notice(int $user_id, string $type, string $message): void {
+function gachasoku_set_favorite_sites_notice($user_id, $type, $message) {
   set_transient(
     'gachasoku_favorite_sites_notice_' . $user_id,
     [
@@ -193,7 +196,7 @@ function gachasoku_set_favorite_sites_notice(int $user_id, string $type, string 
  * @param int $user_id
  * @return array{type:string,message:string}|null
  */
-function gachasoku_get_favorite_sites_notice(int $user_id): ?array {
+function gachasoku_get_favorite_sites_notice($user_id) {
   $notice = get_transient('gachasoku_favorite_sites_notice_' . $user_id);
   if ($notice) {
     delete_transient('gachasoku_favorite_sites_notice_' . $user_id);
@@ -205,7 +208,7 @@ function gachasoku_get_favorite_sites_notice(int $user_id): ?array {
 /**
  * Handle favourite site updates from the My Page form.
  */
-function gachasoku_handle_favorite_sites_submission(): void {
+function gachasoku_handle_favorite_sites_submission() {
   if (empty($_POST['gachasoku_favorite_sites_action'])) {
     return;
   }
@@ -275,7 +278,7 @@ add_action('init', 'gachasoku_handle_favorite_sites_submission');
  * @param WP_Post|null $page Optional specific page object.
  * @return bool
  */
-function gachasoku_is_mypage($page = null): bool {
+function gachasoku_is_mypage($page = null) {
   if (!$page) {
     $page = get_queried_object();
   }
@@ -328,7 +331,7 @@ function gachasoku_is_mypage($page = null): bool {
  *
  * @return string
  */
-function gachasoku_render_favorite_sites_form(): string {
+function gachasoku_render_favorite_sites_form() {
   if (!is_user_logged_in()) {
     return '<p>推しサイトを設定するにはログインしてください。</p>';
   }
@@ -397,7 +400,7 @@ add_shortcode('gachasoku_favorite_sites_form', 'gachasoku_render_favorite_sites_
  * @param string $content
  * @return string
  */
-function gachasoku_append_mypage_favorite_form(string $content): string {
+function gachasoku_append_mypage_favorite_form($content) {
   if (!is_page()) {
     return $content;
   }
@@ -422,7 +425,7 @@ add_filter('the_content', 'gachasoku_append_mypage_favorite_form');
  * @param int $campaign_id
  * @return int[]
  */
-function gachasoku_get_campaign_required_sites(int $campaign_id): array {
+function gachasoku_get_campaign_required_sites($campaign_id) {
   $required = get_post_meta($campaign_id, GACHASOKU_CAMPAIGN_REQUIRED_SITES_META_KEY, true);
   if (!is_array($required)) {
     $required = [];
@@ -438,7 +441,7 @@ function gachasoku_get_campaign_required_sites(int $campaign_id): array {
  * @param int $user_id Optional. Defaults to the current user.
  * @return bool
  */
-function gachasoku_campaign_user_meets_favorite_requirement(int $campaign_id, int $user_id = 0): bool {
+function gachasoku_campaign_user_meets_favorite_requirement($campaign_id, $user_id = 0) {
   $required = gachasoku_get_campaign_required_sites($campaign_id);
   if (empty($required)) {
     return true;
@@ -460,7 +463,7 @@ function gachasoku_campaign_user_meets_favorite_requirement(int $campaign_id, in
  * @param int  $user_id
  * @return bool
  */
-function gachasoku_filter_campaign_entry_by_favorites(bool $can_enter, int $campaign_id, int $user_id): bool {
+function gachasoku_filter_campaign_entry_by_favorites($can_enter, $campaign_id, $user_id) {
   if (!$can_enter) {
     return false;
   }
@@ -472,7 +475,7 @@ add_filter('gachasoku_campaign_user_can_enter', 'gachasoku_filter_campaign_entry
 /**
  * Register campaign meta boxes for favourite site restrictions.
  */
-function gachasoku_get_campaign_post_types(): array {
+function gachasoku_get_campaign_post_types() {
   $post_types = (array) apply_filters('gachasoku_campaign_post_types', ['campaign', 'present', 'lottery', 'raffle']);
   $post_types = array_map('sanitize_key', $post_types);
   $post_types = array_filter($post_types);
@@ -480,7 +483,7 @@ function gachasoku_get_campaign_post_types(): array {
   return array_values(array_unique($post_types));
 }
 
-function gachasoku_register_campaign_meta_box(): void {
+function gachasoku_register_campaign_meta_box() {
   $post_types = gachasoku_get_campaign_post_types();
   if (empty($post_types)) {
     return;
@@ -508,7 +511,7 @@ add_action('add_meta_boxes', 'gachasoku_register_campaign_meta_box');
  *
  * @param WP_Post $post
  */
-function gachasoku_render_campaign_meta_box($post): void {
+function gachasoku_render_campaign_meta_box($post) {
   $options = gachasoku_get_ranking_site_options();
   wp_nonce_field('gachasoku_campaign_favorite_sites', 'gachasoku_campaign_favorite_sites_nonce');
 
@@ -537,7 +540,7 @@ function gachasoku_render_campaign_meta_box($post): void {
  *
  * @param int $post_id
  */
-function gachasoku_save_campaign_meta(int $post_id): void {
+function gachasoku_save_campaign_meta($post_id) {
   $post_type = get_post_type($post_id);
   $allowed_post_types = gachasoku_get_campaign_post_types();
 
@@ -577,7 +580,7 @@ add_action('save_post', 'gachasoku_save_campaign_meta');
  * @param int $user_id Optional. Defaults to current user.
  * @return string
  */
-function gachasoku_get_campaign_requirement_message(int $campaign_id, int $user_id = 0): string {
+function gachasoku_get_campaign_requirement_message($campaign_id, $user_id = 0) {
   $required = gachasoku_get_campaign_required_sites($campaign_id);
   if (empty($required)) {
     return '';
@@ -610,7 +613,10 @@ function gachasoku_get_campaign_requirement_message(int $campaign_id, int $user_
  * @param array<string,string> $atts
  * @return string
  */
-function gachasoku_campaign_requirement_shortcode(array $atts): string {
+function gachasoku_campaign_requirement_shortcode($atts) {
+  if (!is_array($atts)) {
+    $atts = [];
+  }
   $atts = shortcode_atts([
     'id' => 0,
   ], $atts, 'gachasoku_campaign_requirement');
@@ -635,7 +641,7 @@ add_shortcode('gachasoku_campaign_requirement', 'gachasoku_campaign_requirement_
  * @param string $content
  * @return string
  */
-function gachasoku_append_campaign_requirement_notice(string $content): string {
+function gachasoku_append_campaign_requirement_notice($content) {
   if (!post_type_exists('campaign') || !is_singular('campaign')) {
     return $content;
   }
