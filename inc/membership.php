@@ -14,7 +14,7 @@ if (!defined('GACHASOKU_MEMBER_STATUS_WITHDRAWN')) {
 }
 
 if (!defined('GACHASOKU_MEMBERSHIP_DB_VERSION')) {
-  define('GACHASOKU_MEMBERSHIP_DB_VERSION', '2.3.0');
+  define('GACHASOKU_MEMBERSHIP_DB_VERSION', '2.4.0');
 }
 
 if (!defined('GACHASOKU_MEMBERSHIP_PAGES_VERSION')) {
@@ -348,6 +348,9 @@ function gachasoku_prepare_member_record($member) {
     'name' => '',
     'email' => '',
     'status' => GACHASOKU_MEMBER_STATUS_ACTIVE,
+    'favorite_site_primary' => '',
+    'favorite_site_secondary' => '',
+    'favorite_updated_at' => '',
     'created_at' => '',
     'updated_at' => '',
     'last_login' => '',
@@ -437,10 +440,13 @@ function gachasoku_insert_member($name, $email, $password) {
       'email' => $email,
       'password_hash' => $hash,
       'status' => GACHASOKU_MEMBER_STATUS_ACTIVE,
+      'favorite_site_primary' => '',
+      'favorite_site_secondary' => '',
+      'favorite_updated_at' => null,
       'created_at' => $now,
       'updated_at' => $now,
     ],
-    ['%s', '%s', '%s', '%s', '%s', '%s']
+    ['%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s']
   );
 
   if (!$inserted) {
@@ -456,7 +462,16 @@ function gachasoku_update_member($member_id, $data) {
     return new WP_Error('member_not_found', '会員が見つかりません。');
   }
 
-  $allowed = ['name', 'email', 'password_hash', 'status', 'last_login'];
+  $allowed = [
+    'name',
+    'email',
+    'password_hash',
+    'status',
+    'last_login',
+    'favorite_site_primary',
+    'favorite_site_secondary',
+    'favorite_updated_at',
+  ];
   $update = [];
   $formats = [];
 
@@ -468,6 +483,24 @@ function gachasoku_update_member($member_id, $data) {
           return new WP_Error('invalid_member_name', 'お名前を入力してください。絵文字は使用できません。');
         }
         $update[$key] = $normalized_name;
+        $formats[] = '%s';
+        continue;
+      }
+
+      if ($key === 'favorite_site_primary' || $key === 'favorite_site_secondary') {
+        $value = sanitize_key($data[$key]);
+        $update[$key] = $value;
+        $formats[] = '%s';
+        continue;
+      }
+
+      if ($key === 'favorite_updated_at') {
+        $value = $data[$key];
+        if ($value === null || $value === '') {
+          $update[$key] = null;
+        } else {
+          $update[$key] = sanitize_text_field($value);
+        }
         $formats[] = '%s';
         continue;
       }
@@ -522,6 +555,128 @@ function gachasoku_update_member_password($member_id, $password) {
 
   $hash = wp_hash_password($password);
   return gachasoku_update_member($member_id, ['password_hash' => $hash]);
+}
+
+function gachasoku_get_member_favorite_slots($member) {
+  if (!is_array($member)) {
+    $member = gachasoku_get_member_by_id($member);
+  }
+
+  if (!$member) {
+    return [
+      'primary' => '',
+      'secondary' => '',
+      'updated_at' => '',
+    ];
+  }
+
+  return [
+    'primary' => isset($member['favorite_site_primary']) ? sanitize_key($member['favorite_site_primary']) : '',
+    'secondary' => isset($member['favorite_site_secondary']) ? sanitize_key($member['favorite_site_secondary']) : '',
+    'updated_at' => isset($member['favorite_updated_at']) ? $member['favorite_updated_at'] : '',
+  ];
+}
+
+function gachasoku_get_member_favorite_ids($member) {
+  $slots = gachasoku_get_member_favorite_slots($member);
+  $ids = array_filter([$slots['primary'], $slots['secondary']]);
+  $ids = array_values(array_unique(array_map('sanitize_key', $ids)));
+
+  return $ids;
+}
+
+function gachasoku_member_favorites_would_change($member, $primary, $secondary) {
+  $slots = gachasoku_get_member_favorite_slots($member);
+  return $slots['primary'] !== $primary || $slots['secondary'] !== $secondary;
+}
+
+function gachasoku_member_favorites_cooldown_remaining($member, $cooldown_seconds = DAY_IN_SECONDS * 3) {
+  $slots = gachasoku_get_member_favorite_slots($member);
+  $updated_at = isset($slots['updated_at']) ? $slots['updated_at'] : '';
+
+  if (!$updated_at) {
+    return 0;
+  }
+
+  $timestamp = strtotime($updated_at);
+  if (!$timestamp) {
+    return 0;
+  }
+
+  $elapsed = current_time('timestamp') - $timestamp;
+  if ($elapsed >= $cooldown_seconds) {
+    return 0;
+  }
+
+  return max(0, $cooldown_seconds - $elapsed);
+}
+
+function gachasoku_can_member_update_favorites($member, $primary, $secondary) {
+  if (!gachasoku_member_favorites_would_change($member, $primary, $secondary)) {
+    return true;
+  }
+
+  $remaining = gachasoku_member_favorites_cooldown_remaining($member);
+  return $remaining <= 0;
+}
+
+function gachasoku_get_member_favorite_labels($favorite_ids, $entries = null) {
+  $favorite_ids = array_values(array_filter(array_map('sanitize_key', (array) $favorite_ids)));
+  if (empty($favorite_ids)) {
+    return [];
+  }
+
+  if ($entries === null && function_exists('gachasoku_get_ranking_entries')) {
+    $entries = gachasoku_get_ranking_entries();
+  }
+
+  if (!is_array($entries)) {
+    $entries = [];
+  }
+
+  $labels = [];
+  foreach ($entries as $entry) {
+    if (!is_array($entry) || empty($entry['id'])) {
+      continue;
+    }
+
+    $entry_id = sanitize_key($entry['id']);
+    if ($entry_id === '' || !in_array($entry_id, $favorite_ids, true)) {
+      continue;
+    }
+
+    $label = function_exists('gachasoku_get_ranking_entry_display_name')
+      ? gachasoku_get_ranking_entry_display_name($entry)
+      : '';
+
+    if ($label === '' && !empty($entry['name'])) {
+      $label = sanitize_text_field($entry['name']);
+    }
+
+    $labels[$entry_id] = $label !== '' ? $label : $entry_id;
+  }
+
+  foreach ($favorite_ids as $favorite_id) {
+    if (!isset($labels[$favorite_id])) {
+      $labels[$favorite_id] = $favorite_id;
+    }
+  }
+
+  return $labels;
+}
+
+function gachasoku_member_meets_favorite_requirement($member_id, $required_ids) {
+  $required = array_values(array_filter(array_map('sanitize_key', (array) $required_ids)));
+  if (empty($required)) {
+    return true;
+  }
+
+  $favorites = gachasoku_get_member_favorite_ids($member_id);
+  if (empty($favorites)) {
+    return false;
+  }
+
+  return !empty(array_intersect($required, $favorites));
 }
 
 function gachasoku_strip_emoji_from_all_members() {
@@ -819,6 +974,9 @@ function gachasoku_install_membership_tables() {
     email varchar(191) NOT NULL,
     password_hash varchar(255) NOT NULL,
     status varchar(20) NOT NULL DEFAULT 'active',
+    favorite_site_primary varchar(191) NOT NULL DEFAULT '',
+    favorite_site_secondary varchar(191) NOT NULL DEFAULT '',
+    favorite_updated_at datetime DEFAULT NULL,
     created_at datetime NOT NULL,
     updated_at datetime NOT NULL,
     last_login datetime DEFAULT NULL,
@@ -1026,6 +1184,8 @@ function gachasoku_render_campaign_meta_box($post) {
   $max_winners = $fields['max_winners'];
   $chance_up = !empty($fields['chance_up']);
   $chance_link = $fields['chance_link'];
+  $favorite_entries = isset($fields['favorite_entries']) ? array_map('sanitize_key', (array) $fields['favorite_entries']) : [];
+  $ranking_entries = function_exists('gachasoku_get_ranking_entries') ? gachasoku_get_ranking_entries() : [];
   $entry_count = gachasoku_get_campaign_entry_count($post->ID);
 
   $image_src = $image_id ? wp_get_attachment_image_src($image_id, 'medium') : null;
@@ -1102,6 +1262,38 @@ function gachasoku_render_campaign_meta_box($post) {
       </td>
     </tr>
     <tr>
+      <th scope="row">推しサイト制限</th>
+      <td>
+        <?php if (!empty($ranking_entries)) : ?>
+          <fieldset class="gachasoku-campaign-meta__favorites">
+            <?php foreach ($ranking_entries as $entry) :
+              if (!is_array($entry) || empty($entry['id'])) {
+                continue;
+              }
+              $entry_id = sanitize_key($entry['id']);
+              $label = function_exists('gachasoku_get_ranking_entry_display_name')
+                ? gachasoku_get_ranking_entry_display_name($entry)
+                : '';
+              if ($label === '' && !empty($entry['name'])) {
+                $label = sanitize_text_field($entry['name']);
+              }
+              if ($label === '') {
+                $label = $entry_id;
+              }
+              ?>
+              <label class="gachasoku-campaign-meta__favorite">
+                <input type="checkbox" name="gachasoku_campaign_favorites[]" value="<?php echo esc_attr($entry_id); ?>" <?php checked(in_array($entry_id, $favorite_entries, true)); ?> />
+                <span><?php echo esc_html($label); ?></span>
+              </label>
+            <?php endforeach; ?>
+          </fieldset>
+          <p class="description">選択した推しサイトを設定している会員のみ応募できます。未選択の場合は制限なしです。</p>
+        <?php else : ?>
+          <p class="description">ランキングが未設定のため推しサイト制限は利用できません。</p>
+        <?php endif; ?>
+      </td>
+    </tr>
+    <tr>
       <th scope="row">現在の応募数</th>
       <td>
         <span class="gachasoku-campaign-meta__count"><strong><?php echo esc_html(number_format_i18n($entry_count)); ?></strong> 件</span>
@@ -1112,6 +1304,12 @@ function gachasoku_render_campaign_meta_box($post) {
 }
 
 function gachasoku_get_campaign_fields($campaign_id) {
+  $raw_favorites = get_post_meta($campaign_id, '_gachasoku_campaign_favorites', true);
+  if (!is_array($raw_favorites)) {
+    $raw_favorites = $raw_favorites !== '' && $raw_favorites !== null ? [$raw_favorites] : [];
+  }
+  $favorite_entries = array_values(array_filter(array_map('sanitize_key', $raw_favorites)));
+
   return [
     'link' => get_post_meta($campaign_id, '_gachasoku_campaign_link', true),
     'image_id' => intval(get_post_meta($campaign_id, '_gachasoku_campaign_image_id', true)),
@@ -1121,6 +1319,7 @@ function gachasoku_get_campaign_fields($campaign_id) {
     'max_winners' => get_post_meta($campaign_id, '_gachasoku_campaign_max_winners', true),
     'chance_up' => get_post_meta($campaign_id, '_gachasoku_campaign_chance_up', true),
     'chance_link' => get_post_meta($campaign_id, '_gachasoku_campaign_chance_link', true),
+    'favorite_entries' => $favorite_entries,
   ];
 }
 
@@ -1146,6 +1345,16 @@ function gachasoku_save_campaign_meta($post_id) {
   $max_winners = isset($_POST['gachasoku_campaign_max_winners']) ? intval($_POST['gachasoku_campaign_max_winners']) : '';
   $chance_up = isset($_POST['gachasoku_campaign_chance_up']) ? '1' : '';
   $chance_link = isset($_POST['gachasoku_campaign_chance_link']) ? esc_url_raw($_POST['gachasoku_campaign_chance_link']) : '';
+  $favorite_entries = [];
+  if (isset($_POST['gachasoku_campaign_favorites']) && is_array($_POST['gachasoku_campaign_favorites'])) {
+    foreach ($_POST['gachasoku_campaign_favorites'] as $favorite) {
+      $favorite = sanitize_key($favorite);
+      if ($favorite !== '') {
+        $favorite_entries[] = $favorite;
+      }
+    }
+  }
+  $favorite_entries = array_values(array_unique($favorite_entries));
 
   update_post_meta($post_id, '_gachasoku_campaign_link', $link);
   update_post_meta($post_id, '_gachasoku_campaign_image_id', $image_id);
@@ -1168,6 +1377,11 @@ function gachasoku_save_campaign_meta($post_id) {
     update_post_meta($post_id, '_gachasoku_campaign_chance_link', $chance_link);
   } else {
     delete_post_meta($post_id, '_gachasoku_campaign_chance_link');
+  }
+  if (!empty($favorite_entries)) {
+    update_post_meta($post_id, '_gachasoku_campaign_favorites', $favorite_entries);
+  } else {
+    delete_post_meta($post_id, '_gachasoku_campaign_favorites');
   }
 }
 
@@ -1246,6 +1460,7 @@ function gachasoku_enforce_member_privacy_headers() {
     || !empty($_POST['gachasoku_password_reset_submit'])
     || !empty($_POST['gachasoku_campaign_apply'])
     || !empty($_POST['gachasoku_hit_post_submit'])
+    || !empty($_POST['gachasoku_favorites_submit'])
     || !empty($_POST['gachasoku_vote_submit'])
     || !empty($_POST['gachasoku_dashboard_vote']);
 
@@ -1320,6 +1535,10 @@ function gachasoku_handle_membership_requests() {
 
   if (!empty($_POST['gachasoku_email_update_submit'])) {
     gachasoku_handle_email_update();
+  }
+
+  if (!empty($_POST['gachasoku_favorites_submit'])) {
+    gachasoku_handle_favorite_update();
   }
 
   if (!empty($_POST['gachasoku_campaign_apply'])) {
@@ -1552,6 +1771,79 @@ function gachasoku_handle_email_update() {
   gachasoku_add_membership_message('dashboard', 'success', 'メールアドレスを更新しました。');
 }
 
+function gachasoku_handle_favorite_update() {
+  if (!gachasoku_is_member_logged_in()) {
+    gachasoku_add_membership_message('dashboard', 'error', '推しサイトを設定するにはログインが必要です。');
+    return;
+  }
+
+  $nonce = isset($_POST['gachasoku_favorites_nonce']) ? $_POST['gachasoku_favorites_nonce'] : '';
+  if (!wp_verify_nonce($nonce, 'gachasoku_member_favorites')) {
+    gachasoku_add_membership_message('dashboard', 'error', 'フォームの有効期限が切れました。再度お試しください。');
+    return;
+  }
+
+  $member = gachasoku_get_current_member();
+  if (!$member) {
+    gachasoku_add_membership_message('dashboard', 'error', '会員情報を取得できませんでした。');
+    return;
+  }
+
+  $primary = isset($_POST['gachasoku_favorite_primary']) ? sanitize_key($_POST['gachasoku_favorite_primary']) : '';
+  $secondary = isset($_POST['gachasoku_favorite_secondary']) ? sanitize_key($_POST['gachasoku_favorite_secondary']) : '';
+
+  $entries = function_exists('gachasoku_get_ranking_entries') ? gachasoku_get_ranking_entries() : [];
+  $valid_ids = [];
+  foreach ((array) $entries as $entry) {
+    if (!is_array($entry) || empty($entry['id'])) {
+      continue;
+    }
+    $valid_ids[] = sanitize_key($entry['id']);
+  }
+
+  $valid_ids = array_filter(array_unique($valid_ids));
+  $valid_map = array_fill_keys($valid_ids, true);
+
+  if ($primary !== '' && !isset($valid_map[$primary])) {
+    $primary = '';
+  }
+
+  if ($secondary !== '' && !isset($valid_map[$secondary])) {
+    $secondary = '';
+  }
+
+  if ($primary !== '' && $secondary === $primary) {
+    $secondary = '';
+  }
+
+  if (!gachasoku_member_favorites_would_change($member, $primary, $secondary)) {
+    gachasoku_add_membership_message('dashboard', 'success', '推しサイトの設定に変更はありません。');
+    return;
+  }
+
+  if (!gachasoku_can_member_update_favorites($member, $primary, $secondary)) {
+    $remaining = gachasoku_member_favorites_cooldown_remaining($member);
+    $next_ts = current_time('timestamp') + $remaining;
+    $next_label = wp_date('Y/m/d H:i', $next_ts);
+    gachasoku_add_membership_message('dashboard', 'error', sprintf('推しサイトの変更は3日に一度までです。次回は%s以降に変更できます。', $next_label));
+    return;
+  }
+
+  $result = gachasoku_update_member($member['id'], [
+    'favorite_site_primary' => $primary,
+    'favorite_site_secondary' => $secondary,
+    'favorite_updated_at' => current_time('mysql'),
+  ]);
+
+  if (is_wp_error($result)) {
+    gachasoku_add_membership_message('dashboard', 'error', $result->get_error_message());
+    return;
+  }
+
+  gachasoku_get_current_member(true);
+  gachasoku_add_membership_message('dashboard', 'success', '推しサイトの設定を更新しました。');
+}
+
 function gachasoku_handle_campaign_application() {
   $nonce = isset($_POST['gachasoku_campaign_nonce']) ? $_POST['gachasoku_campaign_nonce'] : '';
   if (!wp_verify_nonce($nonce, 'gachasoku_campaign_apply')) {
@@ -1652,6 +1944,11 @@ function gachasoku_register_campaign_entry($campaign_id, $user_id) {
     return new WP_Error('already_applied', '既に応募済みです。');
   }
 
+  $fields = gachasoku_get_campaign_fields($campaign_id);
+  if (!gachasoku_member_meets_favorite_requirement($user_id, isset($fields['favorite_entries']) ? $fields['favorite_entries'] : [])) {
+    return new WP_Error('campaign_ineligible', '推しサイトの条件を満たしていないため応募できません。');
+  }
+
   $now = current_time('mysql');
   $inserted = $wpdb->insert(
     $table,
@@ -1725,6 +2022,13 @@ function gachasoku_get_campaign_card_data($campaign_id) {
     $chance_link = '';
   }
 
+  $favorite_entries = isset($fields['favorite_entries']) ? array_values(array_filter(array_map('sanitize_key', (array) $fields['favorite_entries']))) : [];
+  $favorite_labels = [];
+  if (!empty($favorite_entries)) {
+    $ranking_entries = function_exists('gachasoku_get_ranking_entries') ? gachasoku_get_ranking_entries() : [];
+    $favorite_labels = gachasoku_get_member_favorite_labels($favorite_entries, $ranking_entries);
+  }
+
   return [
     'id' => $campaign_id,
     'title' => get_the_title($campaign_id),
@@ -1741,6 +2045,8 @@ function gachasoku_get_campaign_card_data($campaign_id) {
     'entry_count' => gachasoku_get_campaign_entry_count($campaign_id),
     'is_open' => gachasoku_is_campaign_open($campaign_id),
     'is_finished' => gachasoku_is_campaign_finished($campaign_id),
+    'favorite_entries' => $favorite_entries,
+    'favorite_labels' => $favorite_labels,
   ];
 }
 
@@ -1755,11 +2061,35 @@ function gachasoku_build_campaign_item($campaign_id, $member_id = 0) {
     $has_applied = gachasoku_user_has_applied($campaign_id, $member_id);
   }
 
+  $favorite_entries = isset($card['favorite_entries']) ? array_values(array_filter(array_map('sanitize_key', (array) $card['favorite_entries']))) : [];
+  $eligible = true;
+  $eligibility_message = '';
+
+  if (!empty($favorite_entries) && !$has_applied) {
+    if (!$member_id) {
+      $eligible = false;
+      $labels = array_values($card['favorite_labels']);
+      if (empty($labels)) {
+        $labels = $favorite_entries;
+      }
+      $eligibility_message = sprintf('推しサイト「%s」を推している会員のみ応募できます。ログイン後に推しサイトを設定してください。', implode(' / ', $labels));
+    } elseif (!gachasoku_member_meets_favorite_requirement($member_id, $favorite_entries)) {
+      $eligible = false;
+      $labels = array_values($card['favorite_labels']);
+      if (empty($labels)) {
+        $labels = $favorite_entries;
+      }
+      $eligibility_message = sprintf('推しサイト「%s」を推している会員のみ応募できます。マイページで推しサイトを確認してください。', implode(' / ', $labels));
+    }
+  }
+
   return [
     'campaign_id' => $campaign_id,
     'card' => $card,
     'has_applied' => $has_applied,
     'nonce' => $member_id ? wp_create_nonce('gachasoku_apply_campaign_' . $campaign_id) : '',
+    'eligible' => $eligible,
+    'eligibility_message' => $eligibility_message,
   ];
 }
 
@@ -1796,6 +2126,9 @@ function gachasoku_render_campaign_cards($items, $args = []) {
     $campaign_id = intval($item['campaign_id']);
     $has_applied = !empty($item['has_applied']);
     $nonce = isset($item['nonce']) ? $item['nonce'] : '';
+    $eligible = isset($item['eligible']) ? (bool) $item['eligible'] : true;
+    $eligibility_message = isset($item['eligibility_message']) ? $item['eligibility_message'] : '';
+    $favorite_labels = !empty($card['favorite_labels']) && is_array($card['favorite_labels']) ? array_values($card['favorite_labels']) : [];
     ?>
     <article class="gachasoku-campaign-card">
       <?php if (!empty($card['image'])) : ?>
@@ -1840,10 +2173,20 @@ function gachasoku_render_campaign_cards($items, $args = []) {
             <span data-campaign-entry-count="<?php echo esc_attr($campaign_id); ?>">応募人数：<?php echo esc_html(number_format_i18n($card['entry_count'])); ?>名</span>
           <?php endif; ?>
         </div>
-        <?php if (!empty($card['requirements'])) : ?>
+       <?php if (!empty($card['requirements'])) : ?>
           <div class="gachasoku-campaign-card__requirements">
             <h4>応募条件</h4>
             <?php echo wpautop(wp_kses_post($card['requirements'])); ?>
+          </div>
+        <?php endif; ?>
+        <?php if (!empty($favorite_labels)) : ?>
+          <div class="gachasoku-campaign-card__favorites">
+            <h4>対象の推しサイト</h4>
+            <ul class="gachasoku-campaign-card__favorites-list">
+              <?php foreach ($favorite_labels as $label) : ?>
+                <li><?php echo esc_html($label); ?></li>
+              <?php endforeach; ?>
+            </ul>
           </div>
         <?php endif; ?>
         <?php if (!empty($card['content'])) : ?>
@@ -1862,6 +2205,8 @@ function gachasoku_render_campaign_cards($items, $args = []) {
               'apply_label' => $args['apply_label'],
               'applied_label' => $args['applied_label'],
               'visit_label' => $args['visit_label'],
+              'eligible' => $eligible,
+              'eligibility_message' => $eligibility_message,
             ]
           );
           ?>
@@ -2304,6 +2649,8 @@ function gachasoku_member_dashboard_shortcode() {
       </form>
     </section>
 
+    <?php echo gachasoku_render_member_favorite_section($member, $ranking_entries); ?>
+
     <section class="gachasoku-dashboard__section">
       <h2 class="gachasoku-dashboard__title">ランキング投票状況</h2>
       <?php echo gachasoku_render_member_ranking_summary($member['id'], $ranking_entries); ?>
@@ -2384,6 +2731,120 @@ function gachasoku_render_dashboard_campaign_list($entries, $empty_message, $sho
       </li>
     <?php endforeach; ?>
   </ul>
+  <?php
+  return ob_get_clean();
+}
+
+function gachasoku_render_member_favorite_section($member, $entries = null) {
+  if (!is_array($member)) {
+    $member = gachasoku_get_member_by_id($member);
+  }
+
+  if (!$member) {
+    return '';
+  }
+
+  if ($entries === null && function_exists('gachasoku_get_sorted_ranking_entries')) {
+    $entries = gachasoku_get_sorted_ranking_entries($member['id']);
+  }
+
+  if (!is_array($entries)) {
+    $entries = [];
+  }
+
+  $slots = gachasoku_get_member_favorite_slots($member);
+  $favorite_ids = gachasoku_get_member_favorite_ids($member);
+  $labels_map = gachasoku_get_member_favorite_labels($favorite_ids, $entries);
+  $primary_label = $slots['primary'] !== '' && isset($labels_map[$slots['primary']]) ? $labels_map[$slots['primary']] : '';
+  $secondary_label = $slots['secondary'] !== '' && isset($labels_map[$slots['secondary']]) ? $labels_map[$slots['secondary']] : '';
+
+  $remaining = gachasoku_member_favorites_cooldown_remaining($member);
+  $can_update = $remaining <= 0;
+  $next_label = $can_update ? '' : wp_date('Y/m/d H:i', current_time('timestamp') + $remaining);
+
+  $has_entries = !empty($entries);
+
+  ob_start();
+  ?>
+  <section class="gachasoku-dashboard__section">
+    <h2 class="gachasoku-dashboard__title">推しサイト設定</h2>
+    <form method="post" class="gachasoku-form gachasoku-dashboard__form gachasoku-dashboard__favorites-form">
+      <p class="gachasoku-dashboard__favorites-note">推しサイトは最大2つまで設定でき、3日に一度変更できます。</p>
+      <?php wp_nonce_field('gachasoku_member_favorites', 'gachasoku_favorites_nonce'); ?>
+      <div class="gachasoku-dashboard__favorites-grid">
+        <div class="gachasoku-form__field">
+          <label for="gachasoku_favorite_primary">推しサイト1</label>
+          <select name="gachasoku_favorite_primary" id="gachasoku_favorite_primary"<?php disabled(!$can_update || !$has_entries); ?>>
+            <option value="">選択してください</option>
+            <?php foreach ($entries as $entry) :
+              if (!is_array($entry) || empty($entry['id'])) {
+                continue;
+              }
+              $entry_id = sanitize_key($entry['id']);
+              $label = function_exists('gachasoku_get_ranking_entry_display_name')
+                ? gachasoku_get_ranking_entry_display_name($entry)
+                : '';
+              if ($label === '' && !empty($entry['name'])) {
+                $label = sanitize_text_field($entry['name']);
+              }
+              if ($label === '') {
+                $label = $entry_id;
+              }
+              ?>
+              <option value="<?php echo esc_attr($entry_id); ?>" <?php selected($slots['primary'], $entry_id); ?>><?php echo esc_html($label); ?></option>
+            <?php endforeach; ?>
+          </select>
+        </div>
+        <div class="gachasoku-form__field">
+          <label for="gachasoku_favorite_secondary">推しサイト2</label>
+          <select name="gachasoku_favorite_secondary" id="gachasoku_favorite_secondary"<?php disabled(!$can_update || !$has_entries); ?>>
+            <option value="">選択してください</option>
+            <?php foreach ($entries as $entry) :
+              if (!is_array($entry) || empty($entry['id'])) {
+                continue;
+              }
+              $entry_id = sanitize_key($entry['id']);
+              $label = function_exists('gachasoku_get_ranking_entry_display_name')
+                ? gachasoku_get_ranking_entry_display_name($entry)
+                : '';
+              if ($label === '' && !empty($entry['name'])) {
+                $label = sanitize_text_field($entry['name']);
+              }
+              if ($label === '') {
+                $label = $entry_id;
+              }
+              ?>
+              <option value="<?php echo esc_attr($entry_id); ?>" <?php selected($slots['secondary'], $entry_id); ?>><?php echo esc_html($label); ?></option>
+            <?php endforeach; ?>
+          </select>
+        </div>
+      </div>
+      <?php if (!$has_entries) : ?>
+        <p class="gachasoku-dashboard__favorites-warning">ランキングが設定されていないため推しサイトを選択できません。</p>
+      <?php elseif (!$can_update) : ?>
+        <p class="gachasoku-dashboard__favorites-warning">次回の変更可能日時：<?php echo esc_html($next_label); ?></p>
+      <?php endif; ?>
+      <div class="gachasoku-form__actions">
+        <button type="submit" class="gachasoku-button"<?php disabled(!$can_update || !$has_entries); ?>>推しサイトを更新</button>
+      </div>
+      <input type="hidden" name="gachasoku_favorites_submit" value="1" />
+    </form>
+    <div class="gachasoku-dashboard__favorites-summary">
+      <h3 class="gachasoku-dashboard__favorites-heading">現在の推しサイト</h3>
+      <?php if ($primary_label || $secondary_label) : ?>
+        <ul class="gachasoku-dashboard__favorites-list">
+          <?php if ($primary_label) : ?>
+            <li><span class="gachasoku-dashboard__favorites-slot">1.</span><?php echo esc_html($primary_label); ?></li>
+          <?php endif; ?>
+          <?php if ($secondary_label) : ?>
+            <li><span class="gachasoku-dashboard__favorites-slot">2.</span><?php echo esc_html($secondary_label); ?></li>
+          <?php endif; ?>
+        </ul>
+      <?php else : ?>
+        <p class="gachasoku-dashboard__favorites-empty">推しサイトはまだ設定されていません。</p>
+      <?php endif; ?>
+    </div>
+  </section>
   <?php
   return ob_get_clean();
 }
@@ -3097,6 +3558,8 @@ function gachasoku_render_campaign_action($campaign_id, $card, $has_applied, $ar
     'apply_label' => 'このキャンペーンに応募する',
     'applied_label' => '応募済み',
     'visit_label' => '公式サイトへ',
+    'eligible' => true,
+    'eligibility_message' => '推しサイトの条件を満たしていません。',
   ];
   $args = wp_parse_args($args, $defaults);
 
@@ -3106,6 +3569,13 @@ function gachasoku_render_campaign_action($campaign_id, $card, $has_applied, $ar
 
   if (!$card['is_open']) {
     return '<p class="gachasoku-campaign-card__notice">応募期間外です。</p>';
+  }
+
+  if (empty($args['eligible'])) {
+    $message = is_string($args['eligibility_message']) && $args['eligibility_message'] !== ''
+      ? $args['eligibility_message']
+      : '推しサイトの条件を満たしていません。';
+    return '<p class="gachasoku-campaign-card__notice">' . esc_html($message) . '</p>';
   }
 
   if ($has_applied) {
