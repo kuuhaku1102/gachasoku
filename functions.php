@@ -231,6 +231,45 @@ function gachasoku_handle_favorite_sites_submission(): void {
 add_action('init', 'gachasoku_handle_favorite_sites_submission');
 
 /**
+ * Determine whether the current request targets the My Page view.
+ *
+ * @param WP_Post|null $page Optional specific page object.
+ * @return bool
+ */
+function gachasoku_is_mypage($page = null): bool {
+  if (!$page) {
+    $page = get_queried_object();
+  }
+
+  if (!$page || !($page instanceof WP_Post)) {
+    return false;
+  }
+
+  $page_slug = $page->post_name ?? '';
+  $page_title = wp_strip_all_tags($page->post_title ?? '');
+
+  $target_slugs = (array) apply_filters('gachasoku_mypage_slugs', ['mypage', 'my-page']);
+  $normalized_slugs = array_filter(array_map('sanitize_title', $target_slugs));
+
+  if ($page_slug && in_array($page_slug, $target_slugs, true)) {
+    return true;
+  }
+
+  if ($page_slug && in_array(sanitize_title($page_slug), $normalized_slugs, true)) {
+    return true;
+  }
+
+  $target_titles = (array) apply_filters('gachasoku_mypage_titles', ['マイページ']);
+  foreach ($target_titles as $target_title) {
+    if ($target_title !== '' && $page_title === wp_strip_all_tags($target_title)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/**
  * Render the favourite site selection form for the My Page.
  *
  * @return string
@@ -310,17 +349,13 @@ function gachasoku_append_mypage_favorite_form(string $content): string {
   }
 
   $page = get_queried_object();
-  if (!$page || !isset($page->post_name)) {
+  if (!gachasoku_is_mypage($page)) {
     return $content;
   }
 
-  $target_slugs = apply_filters('gachasoku_mypage_slugs', ['mypage', 'my-page']);
-  $target_titles = apply_filters('gachasoku_mypage_titles', ['マイページ']);
-
-  $is_target = in_array($page->post_name, (array) $target_slugs, true) || in_array($page->post_title, (array) $target_titles, true);
-
-  if ($is_target) {
+  if (empty($GLOBALS['gachasoku_favorite_sites_form_appended'])) {
     $content .= do_shortcode('[gachasoku_favorite_sites_form]');
+    $GLOBALS['gachasoku_favorite_sites_form_appended'] = true;
   }
 
   return $content;
