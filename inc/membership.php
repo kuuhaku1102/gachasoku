@@ -590,7 +590,7 @@ function gachasoku_member_favorites_would_change($member, $primary, $secondary) 
   return $slots['primary'] !== $primary || $slots['secondary'] !== $secondary;
 }
 
-function gachasoku_member_favorites_cooldown_remaining($member, $cooldown_seconds = DAY_IN_SECONDS * 3) {
+function gachasoku_member_favorites_cooldown_remaining($member, $cooldown_seconds = DAY_IN_SECONDS * 7) {
   $slots = gachasoku_get_member_favorite_slots($member);
   $updated_at = isset($slots['updated_at']) ? $slots['updated_at'] : '';
 
@@ -1826,7 +1826,7 @@ function gachasoku_handle_favorite_update() {
     $remaining = gachasoku_member_favorites_cooldown_remaining($member);
     $next_ts = current_time('timestamp') + $remaining;
     $next_label = wp_date('Y/m/d H:i', $next_ts);
-    gachasoku_add_membership_message('dashboard', 'error', sprintf('推しサイトの変更は3日に一度までです。次回は%s以降に変更できます。', $next_label));
+    gachasoku_add_membership_message('dashboard', 'error', sprintf('推しサイトの変更は1週間に一度までです。次回は%s以降に変更できます。', $next_label));
     return;
   }
 
@@ -2770,7 +2770,7 @@ function gachasoku_render_member_favorite_section($member, $entries = null) {
   <section class="gachasoku-dashboard__section">
     <h2 class="gachasoku-dashboard__title">推しサイト設定</h2>
     <form method="post" class="gachasoku-form gachasoku-dashboard__form gachasoku-dashboard__favorites-form">
-      <p class="gachasoku-dashboard__favorites-note">推しサイトは最大2つまで設定でき、3日に一度変更できます。</p>
+      <p class="gachasoku-dashboard__favorites-note">推しサイトは最大2つまで設定でき、1週間に一度変更できます。</p>
       <?php wp_nonce_field('gachasoku_member_favorites', 'gachasoku_favorites_nonce'); ?>
       <div class="gachasoku-dashboard__favorites-grid">
         <div class="gachasoku-form__field">
