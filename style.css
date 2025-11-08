@@ -2408,6 +2408,30 @@ main {
   letter-spacing: 0.02em;
 }
 
+.gachasoku-campaign-card__hit-bonus {
+  margin-top: 14px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: rgba(248, 113, 113, 0.08);
+  border: 1px solid rgba(248, 113, 113, 0.3);
+  color: #7f1d1d;
+  font-size: 0.95rem;
+  line-height: 1.6;
+}
+
+.gachasoku-campaign-card__hit-bonus strong {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.gachasoku-campaign-card__hit-bonus-period {
+  margin: 6px 0 0;
+  font-size: 0.85rem;
+  color: #991b1b;
+}
+
 .gachasoku-campaign-card__dates {
   display: flex;
   flex-wrap: wrap;
