@@ -1484,6 +1484,82 @@ function gachasoku_render_calendar_admin_page() {
   <?php
 }
 
+function gachasoku_get_calendar_weekday_labels() {
+  return [
+    '0' => '日曜日',
+    '1' => '月曜日',
+    '2' => '火曜日',
+    '3' => '水曜日',
+    '4' => '木曜日',
+    '5' => '金曜日',
+    '6' => '土曜日',
+  ];
+}
+
+function gachasoku_format_calendar_admin_date_label($date_string) {
+  if (empty($date_string)) {
+    return '';
+  }
+
+  $timestamp = strtotime($date_string);
+  if ($timestamp === false) {
+    return $date_string;
+  }
+
+  return date_i18n('Y年n月j日', $timestamp);
+}
+
+function gachasoku_format_calendar_admin_summary($event) {
+  $type = isset($event['type']) ? $event['type'] : 'single';
+  $weekday_labels = gachasoku_get_calendar_weekday_labels();
+
+  $parts = [];
+
+  if ($type === 'single') {
+    $label = gachasoku_format_calendar_admin_date_label(isset($event['start_date']) ? $event['start_date'] : '');
+    if ($label !== '') {
+      $parts[] = $label;
+    }
+  } elseif ($type === 'range') {
+    $start = gachasoku_format_calendar_admin_date_label(isset($event['start_date']) ? $event['start_date'] : '');
+    $end = gachasoku_format_calendar_admin_date_label(isset($event['end_date']) ? $event['end_date'] : '');
+    if ($start && $end) {
+      $parts[] = $start . ' 〜 ' . $end;
+    } elseif ($start) {
+      $parts[] = $start;
+    } elseif ($end) {
+      $parts[] = $end;
+    }
+  } elseif ($type === 'monthly') {
+    if (!empty($event['month_day'])) {
+      $parts[] = '毎月' . intval($event['month_day']) . '日';
+    }
+  } elseif ($type === 'weekday') {
+    $weekday = isset($event['weekday']) ? strval($event['weekday']) : '';
+    if ($weekday !== '' && isset($weekday_labels[$weekday])) {
+      $parts[] = '毎週' . $weekday_labels[$weekday];
+    }
+  }
+
+  if (!empty($event['time_text'])) {
+    $parts[] = $event['time_text'];
+  }
+
+  if (!empty($event['notes'])) {
+    $snippet = wp_strip_all_tags($event['notes']);
+    if (mb_strlen($snippet) > 20) {
+      $snippet = mb_substr($snippet, 0, 20) . '…';
+    }
+    $parts[] = $snippet;
+  }
+
+  if (!$parts) {
+    return '日程未設定';
+  }
+
+  return implode(' / ', $parts);
+}
+
 function gachasoku_render_calendar_event_fields($index, $event) {
   $title = isset($event['title']) ? $event['title'] : '';
   $url = isset($event['url']) ? $event['url'] : '';
@@ -1495,80 +1571,86 @@ function gachasoku_render_calendar_event_fields($index, $event) {
   $time_text = isset($event['time_text']) ? $event['time_text'] : '';
   $notes = isset($event['notes']) ? $event['notes'] : '';
 
-  $weekday_options = [
-    '0' => '日曜日',
-    '1' => '月曜日',
-    '2' => '火曜日',
-    '3' => '水曜日',
-    '4' => '木曜日',
-    '5' => '金曜日',
-    '6' => '土曜日',
-  ];
+  $weekday_options = gachasoku_get_calendar_weekday_labels();
+  $summary = gachasoku_format_calendar_admin_summary($event);
+  $title_display = $title !== '' ? $title : '（タイトル未設定）';
   ?>
   <div class="gachasoku-calendar-entry" data-index="<?php echo esc_attr($index); ?>">
-    <h2>イベント <span class="gachasoku-calendar-entry__number"></span></h2>
-    <div class="gachasoku-calendar-entry__fields">
-      <label>
-        イベント名
-        <input type="text" name="gachasoku_calendar_events[<?php echo esc_attr($index); ?>][title]" value="<?php echo esc_attr($title); ?>" placeholder="イベント名" />
-      </label>
-      <label>
-        リンクURL
-        <input type="url" name="gachasoku_calendar_events[<?php echo esc_attr($index); ?>][url]" value="<?php echo esc_attr($url); ?>" placeholder="https://" />
-      </label>
-      <label>
-        種別
-        <select name="gachasoku_calendar_events[<?php echo esc_attr($index); ?>][type]" class="gachasoku-calendar-type">
-          <option value="single" <?php selected($type, 'single'); ?>>単日（1日のみ）</option>
-          <option value="range" <?php selected($type, 'range'); ?>>期間（開始〜終了）</option>
-          <option value="monthly" <?php selected($type, 'monthly'); ?>>毎月（日付指定）</option>
-          <option value="weekday" <?php selected($type, 'weekday'); ?>>毎週（曜日指定）</option>
-        </select>
-      </label>
-      <div class="gachasoku-calendar-dates" data-type="single">
-        <label>
-          開催日
-          <input type="date" name="gachasoku_calendar_events[<?php echo esc_attr($index); ?>][start_date]" value="<?php echo esc_attr($start_date); ?>" />
-        </label>
+    <div class="gachasoku-calendar-entry__header">
+      <button type="button" class="gachasoku-calendar-entry__toggle" aria-expanded="false">
+        <span class="gachasoku-calendar-entry__badge"><span class="gachasoku-calendar-entry__number"></span></span>
+        <span class="gachasoku-calendar-entry__summary">
+          <span class="gachasoku-calendar-entry__summary-title"><?php echo esc_html($title_display); ?></span>
+          <span class="gachasoku-calendar-entry__summary-meta"><?php echo esc_html($summary); ?></span>
+        </span>
+      </button>
+      <div class="gachasoku-calendar-entry__actions">
+        <button type="button" class="button button-secondary gachasoku-calendar-duplicate">複製</button>
+        <button type="button" class="button-link-delete gachasoku-calendar-remove">削除</button>
       </div>
-      <div class="gachasoku-calendar-dates" data-type="range">
-        <label>
-          開始日
-          <input type="date" name="gachasoku_calendar_events[<?php echo esc_attr($index); ?>][start_date]" value="<?php echo esc_attr($start_date); ?>" />
+    </div>
+    <div class="gachasoku-calendar-entry__body" hidden>
+      <div class="gachasoku-calendar-entry__fields">
+        <label class="gachasoku-calendar-entry__field">
+          <span class="gachasoku-calendar-entry__field-label">イベント名</span>
+          <input type="text" name="gachasoku_calendar_events[<?php echo esc_attr($index); ?>][title]" value="<?php echo esc_attr($title); ?>" placeholder="イベント名" />
         </label>
-        <label>
-          終了日
-          <input type="date" name="gachasoku_calendar_events[<?php echo esc_attr($index); ?>][end_date]" value="<?php echo esc_attr($end_date); ?>" />
+        <label class="gachasoku-calendar-entry__field">
+          <span class="gachasoku-calendar-entry__field-label">リンクURL</span>
+          <input type="url" name="gachasoku_calendar_events[<?php echo esc_attr($index); ?>][url]" value="<?php echo esc_attr($url); ?>" placeholder="https://" />
         </label>
-      </div>
-      <div class="gachasoku-calendar-dates" data-type="monthly">
-        <label>
-          毎月の日付（1〜31）
-          <input type="number" min="1" max="31" name="gachasoku_calendar_events[<?php echo esc_attr($index); ?>][month_day]" value="<?php echo esc_attr($month_day); ?>" />
-        </label>
-      </div>
-      <div class="gachasoku-calendar-dates" data-type="weekday">
-        <label>
-          曜日
-          <select name="gachasoku_calendar_events[<?php echo esc_attr($index); ?>][weekday]">
-            <option value="">選択してください</option>
-            <?php foreach ($weekday_options as $weekday_value => $weekday_label) : ?>
-              <option value="<?php echo esc_attr($weekday_value); ?>" <?php selected(strval($weekday), strval($weekday_value)); ?>><?php echo esc_html($weekday_label); ?></option>
-            <?php endforeach; ?>
+        <label class="gachasoku-calendar-entry__field">
+          <span class="gachasoku-calendar-entry__field-label">種別</span>
+          <select name="gachasoku_calendar_events[<?php echo esc_attr($index); ?>][type]" class="gachasoku-calendar-type">
+            <option value="single" <?php selected($type, 'single'); ?>>単日（1日のみ）</option>
+            <option value="range" <?php selected($type, 'range'); ?>>期間（開始〜終了）</option>
+            <option value="monthly" <?php selected($type, 'monthly'); ?>>毎月（日付指定）</option>
+            <option value="weekday" <?php selected($type, 'weekday'); ?>>毎週（曜日指定）</option>
           </select>
         </label>
+        <div class="gachasoku-calendar-entry__field-group gachasoku-calendar-dates" data-type="single">
+          <label class="gachasoku-calendar-entry__field">
+            <span class="gachasoku-calendar-entry__field-label">開催日</span>
+            <input type="date" name="gachasoku_calendar_events[<?php echo esc_attr($index); ?>][start_date]" value="<?php echo esc_attr($start_date); ?>" />
+          </label>
+        </div>
+        <div class="gachasoku-calendar-entry__field-group gachasoku-calendar-dates" data-type="range">
+          <label class="gachasoku-calendar-entry__field">
+            <span class="gachasoku-calendar-entry__field-label">開始日</span>
+            <input type="date" name="gachasoku_calendar_events[<?php echo esc_attr($index); ?>][start_date]" value="<?php echo esc_attr($start_date); ?>" />
+          </label>
+          <label class="gachasoku-calendar-entry__field">
+            <span class="gachasoku-calendar-entry__field-label">終了日</span>
+            <input type="date" name="gachasoku_calendar_events[<?php echo esc_attr($index); ?>][end_date]" value="<?php echo esc_attr($end_date); ?>" />
+          </label>
+        </div>
+        <div class="gachasoku-calendar-entry__field-group gachasoku-calendar-dates" data-type="monthly">
+          <label class="gachasoku-calendar-entry__field">
+            <span class="gachasoku-calendar-entry__field-label">毎月の日付（1〜31）</span>
+            <input type="number" min="1" max="31" name="gachasoku_calendar_events[<?php echo esc_attr($index); ?>][month_day]" value="<?php echo esc_attr($month_day); ?>" />
+          </label>
+        </div>
+        <div class="gachasoku-calendar-entry__field-group gachasoku-calendar-dates" data-type="weekday">
+          <label class="gachasoku-calendar-entry__field">
+            <span class="gachasoku-calendar-entry__field-label">曜日</span>
+            <select name="gachasoku_calendar_events[<?php echo esc_attr($index); ?>][weekday]">
+              <option value="">選択してください</option>
+              <?php foreach ($weekday_options as $weekday_value => $weekday_label) : ?>
+                <option value="<?php echo esc_attr($weekday_value); ?>" <?php selected(strval($weekday), strval($weekday_value)); ?>><?php echo esc_html($weekday_label); ?></option>
+              <?php endforeach; ?>
+            </select>
+          </label>
+        </div>
+        <label class="gachasoku-calendar-entry__field">
+          <span class="gachasoku-calendar-entry__field-label">時間・補足</span>
+          <input type="text" name="gachasoku_calendar_events[<?php echo esc_attr($index); ?>][time_text]" value="<?php echo esc_attr($time_text); ?>" placeholder="例: 10:00〜 / 夜開催" />
+        </label>
+        <label class="gachasoku-calendar-entry__field gachasoku-calendar-entry__field--textarea">
+          <span class="gachasoku-calendar-entry__field-label">メモ（任意）</span>
+          <textarea name="gachasoku_calendar_events[<?php echo esc_attr($index); ?>][notes]" rows="3" placeholder="詳細メモなど"><?php echo esc_textarea($notes); ?></textarea>
+        </label>
       </div>
-      <label>
-        時間・補足
-        <input type="text" name="gachasoku_calendar_events[<?php echo esc_attr($index); ?>][time_text]" value="<?php echo esc_attr($time_text); ?>" placeholder="例: 10:00〜 / 夜開催" />
-      </label>
-      <label>
-        メモ（任意）
-        <textarea name="gachasoku_calendar_events[<?php echo esc_attr($index); ?>][notes]" rows="3" placeholder="詳細メモなど"><?php echo esc_textarea($notes); ?></textarea>
-      </label>
     </div>
-    <button type="button" class="button-link-delete gachasoku-calendar-remove">このイベントを削除</button>
-    <hr />
   </div>
   <?php
 }
