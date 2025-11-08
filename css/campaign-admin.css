@@ -81,3 +81,22 @@
   font-weight: 600;
   color: #0f172a;
 }
+
+.gachasoku-campaign-meta__hit-bonus-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px 18px;
+  margin-top: 12px;
+}
+
+.gachasoku-campaign-meta__hit-bonus-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.gachasoku-campaign-meta__hit-bonus-grid input {
+  width: 100%;
+}

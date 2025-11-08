@@ -201,6 +201,43 @@ function gachasoku_normalize_redirect_url($requested, $fallback) {
   return wp_validate_redirect($fallback, home_url('/'));
 }
 
+function gachasoku_sanitize_datetime_local($value) {
+  $value = is_string($value) ? trim($value) : '';
+  if ($value === '') {
+    return '';
+  }
+
+  $value = str_replace(' ', 'T', $value);
+  if (!preg_match('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/', $value)) {
+    $timestamp = strtotime($value);
+    if ($timestamp === false) {
+      return '';
+    }
+    $value = date_i18n('Y-m-d\TH:i', $timestamp, false);
+  }
+
+  return $value;
+}
+
+function gachasoku_datetime_local_to_mysql($value) {
+  $value = is_string($value) ? trim($value) : '';
+  if ($value === '') {
+    return '';
+  }
+
+  $value = str_replace('T', ' ', $value);
+  if (preg_match('/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/', $value)) {
+    $value .= ':00';
+  }
+
+  $timestamp = strtotime($value);
+  if ($timestamp === false) {
+    return '';
+  }
+
+  return date_i18n('Y-m-d H:i:s', $timestamp, false);
+}
+
 function gachasoku_get_login_redirect_url($requested = '', $member = null) {
   $default = gachasoku_get_default_login_redirect_url();
   $redirect = gachasoku_normalize_redirect_url($requested, $default);
@@ -1185,6 +1222,13 @@ function gachasoku_render_campaign_meta_box($post) {
   $max_winners = $fields['max_winners'];
   $chance_up = !empty($fields['chance_up']);
   $chance_link = $fields['chance_link'];
+  $hit_bonus_enabled = !empty($fields['hit_bonus_enabled']);
+  $hit_bonus_start = isset($fields['hit_bonus_start']) ? $fields['hit_bonus_start'] : '';
+  $hit_bonus_end = isset($fields['hit_bonus_end']) ? $fields['hit_bonus_end'] : '';
+  $hit_bonus_weight = isset($fields['hit_bonus_weight']) ? intval($fields['hit_bonus_weight']) : 2;
+  if ($hit_bonus_weight < 2) {
+    $hit_bonus_weight = 2;
+  }
   $favorite_entries = isset($fields['favorite_entries']) ? array_map('sanitize_key', (array) $fields['favorite_entries']) : [];
   $ranking_entries = function_exists('gachasoku_get_ranking_entries') ? gachasoku_get_ranking_entries() : [];
   $entry_count = gachasoku_get_campaign_entry_count($post->ID);
@@ -1263,6 +1307,30 @@ function gachasoku_render_campaign_meta_box($post) {
       </td>
     </tr>
     <tr>
+      <th scope="row">みんなのガチャ投稿ボーナス</th>
+      <td>
+        <label class="gachasoku-campaign-meta__toggle">
+          <input type="checkbox" name="gachasoku_campaign_hit_bonus_enabled" value="1" <?php checked($hit_bonus_enabled); ?> />
+          <span>期間中に投稿した会員の抽選倍率を自動でアップする</span>
+        </label>
+        <p class="description">指定期間に「みんなのガチャ投稿」を公開した会員の倍率を設定値で乗算します。</p>
+        <div class="gachasoku-campaign-meta__hit-bonus-grid">
+          <label>
+            対象期間（開始）
+            <input type="datetime-local" name="gachasoku_campaign_hit_bonus_start" value="<?php echo esc_attr($hit_bonus_start); ?>" />
+          </label>
+          <label>
+            対象期間（終了）
+            <input type="datetime-local" name="gachasoku_campaign_hit_bonus_end" value="<?php echo esc_attr($hit_bonus_end); ?>" />
+          </label>
+          <label>
+            倍率
+            <input type="number" name="gachasoku_campaign_hit_bonus_weight" min="2" max="10" value="<?php echo esc_attr($hit_bonus_weight); ?>" />
+          </label>
+        </div>
+      </td>
+    </tr>
+    <tr>
       <th scope="row">推しサイト制限</th>
       <td>
         <?php if (!empty($ranking_entries)) : ?>
@@ -1320,6 +1388,10 @@ function gachasoku_get_campaign_fields($campaign_id) {
     'max_winners' => get_post_meta($campaign_id, '_gachasoku_campaign_max_winners', true),
     'chance_up' => get_post_meta($campaign_id, '_gachasoku_campaign_chance_up', true),
     'chance_link' => get_post_meta($campaign_id, '_gachasoku_campaign_chance_link', true),
+    'hit_bonus_enabled' => get_post_meta($campaign_id, '_gachasoku_campaign_hit_bonus_enabled', true),
+    'hit_bonus_start' => get_post_meta($campaign_id, '_gachasoku_campaign_hit_bonus_start', true),
+    'hit_bonus_end' => get_post_meta($campaign_id, '_gachasoku_campaign_hit_bonus_end', true),
+    'hit_bonus_weight' => intval(get_post_meta($campaign_id, '_gachasoku_campaign_hit_bonus_weight', true)),
     'favorite_entries' => $favorite_entries,
   ];
 }
@@ -1346,6 +1418,15 @@ function gachasoku_save_campaign_meta($post_id) {
   $max_winners = isset($_POST['gachasoku_campaign_max_winners']) ? intval($_POST['gachasoku_campaign_max_winners']) : '';
   $chance_up = isset($_POST['gachasoku_campaign_chance_up']) ? '1' : '';
   $chance_link = isset($_POST['gachasoku_campaign_chance_link']) ? esc_url_raw($_POST['gachasoku_campaign_chance_link']) : '';
+  $hit_bonus_enabled = isset($_POST['gachasoku_campaign_hit_bonus_enabled']) ? '1' : '';
+  $hit_bonus_start = isset($_POST['gachasoku_campaign_hit_bonus_start']) ? gachasoku_sanitize_datetime_local($_POST['gachasoku_campaign_hit_bonus_start']) : '';
+  $hit_bonus_end = isset($_POST['gachasoku_campaign_hit_bonus_end']) ? gachasoku_sanitize_datetime_local($_POST['gachasoku_campaign_hit_bonus_end']) : '';
+  $hit_bonus_weight = isset($_POST['gachasoku_campaign_hit_bonus_weight']) ? intval($_POST['gachasoku_campaign_hit_bonus_weight']) : 0;
+  if ($hit_bonus_weight < 2) {
+    $hit_bonus_weight = 2;
+  } elseif ($hit_bonus_weight > 10) {
+    $hit_bonus_weight = 10;
+  }
   $favorite_entries = [];
   if (isset($_POST['gachasoku_campaign_favorites']) && is_array($_POST['gachasoku_campaign_favorites'])) {
     foreach ($_POST['gachasoku_campaign_favorites'] as $favorite) {
@@ -1378,6 +1459,30 @@ function gachasoku_save_campaign_meta($post_id) {
     update_post_meta($post_id, '_gachasoku_campaign_chance_link', $chance_link);
   } else {
     delete_post_meta($post_id, '_gachasoku_campaign_chance_link');
+  }
+
+  if ($hit_bonus_enabled) {
+    update_post_meta($post_id, '_gachasoku_campaign_hit_bonus_enabled', '1');
+  } else {
+    delete_post_meta($post_id, '_gachasoku_campaign_hit_bonus_enabled');
+  }
+
+  if ($hit_bonus_start !== '') {
+    update_post_meta($post_id, '_gachasoku_campaign_hit_bonus_start', $hit_bonus_start);
+  } else {
+    delete_post_meta($post_id, '_gachasoku_campaign_hit_bonus_start');
+  }
+
+  if ($hit_bonus_end !== '') {
+    update_post_meta($post_id, '_gachasoku_campaign_hit_bonus_end', $hit_bonus_end);
+  } else {
+    delete_post_meta($post_id, '_gachasoku_campaign_hit_bonus_end');
+  }
+
+  if ($hit_bonus_weight >= 2) {
+    update_post_meta($post_id, '_gachasoku_campaign_hit_bonus_weight', $hit_bonus_weight);
+  } else {
+    delete_post_meta($post_id, '_gachasoku_campaign_hit_bonus_weight');
   }
   if (!empty($favorite_entries)) {
     update_post_meta($post_id, '_gachasoku_campaign_favorites', $favorite_entries);
@@ -2008,6 +2113,54 @@ function gachasoku_is_campaign_finished($campaign_id) {
   return $end_ts < current_time('timestamp');
 }
 
+function gachasoku_get_campaign_hit_bonus_context($campaign_id, $fields = null, $load_members = false) {
+  if ($fields === null) {
+    $fields = gachasoku_get_campaign_fields($campaign_id);
+  }
+
+  $enabled = !empty($fields['hit_bonus_enabled']);
+  $weight = isset($fields['hit_bonus_weight']) ? intval($fields['hit_bonus_weight']) : 0;
+  if ($weight < 2) {
+    $weight = 2;
+  }
+
+  if (!$enabled || $weight <= 1) {
+    return [
+      'enabled' => false,
+      'multiplier' => 1,
+      'member_ids' => [],
+      'start' => '',
+      'end' => '',
+      'start_local' => isset($fields['hit_bonus_start']) ? $fields['hit_bonus_start'] : '',
+      'end_local' => isset($fields['hit_bonus_end']) ? $fields['hit_bonus_end'] : '',
+    ];
+  }
+
+  $start_local = isset($fields['hit_bonus_start']) ? $fields['hit_bonus_start'] : '';
+  $end_local = isset($fields['hit_bonus_end']) ? $fields['hit_bonus_end'] : '';
+  $start = gachasoku_datetime_local_to_mysql($start_local);
+  $end = gachasoku_datetime_local_to_mysql($end_local);
+
+  $member_ids = [];
+  if ($load_members) {
+    $member_ids = gachasoku_get_hit_post_member_ids([
+      'status' => 'published',
+      'updated_after' => $start,
+      'updated_before' => $end,
+    ]);
+  }
+
+  return [
+    'enabled' => true,
+    'multiplier' => $weight,
+    'member_ids' => $member_ids,
+    'start' => $start,
+    'end' => $end,
+    'start_local' => $start_local,
+    'end_local' => $end_local,
+  ];
+}
+
 function gachasoku_get_campaign_card_data($campaign_id) {
   $post = get_post($campaign_id);
   if (!$post || $post->post_type !== 'gachasoku_campaign') {
@@ -2030,6 +2183,8 @@ function gachasoku_get_campaign_card_data($campaign_id) {
     $favorite_labels = gachasoku_get_member_favorite_labels($favorite_entries, $ranking_entries);
   }
 
+  $hit_bonus = gachasoku_get_campaign_hit_bonus_context($campaign_id, $fields, false);
+
   return [
     'id' => $campaign_id,
     'title' => get_the_title($campaign_id),
@@ -2048,6 +2203,7 @@ function gachasoku_get_campaign_card_data($campaign_id) {
     'is_finished' => gachasoku_is_campaign_finished($campaign_id),
     'favorite_entries' => $favorite_entries,
     'favorite_labels' => $favorite_labels,
+    'hit_bonus' => $hit_bonus,
   ];
 }
 
@@ -2130,6 +2286,7 @@ function gachasoku_render_campaign_cards($items, $args = []) {
     $eligible = isset($item['eligible']) ? (bool) $item['eligible'] : true;
     $eligibility_message = isset($item['eligibility_message']) ? $item['eligibility_message'] : '';
     $favorite_labels = !empty($card['favorite_labels']) && is_array($card['favorite_labels']) ? array_values($card['favorite_labels']) : [];
+    $hit_bonus = isset($card['hit_bonus']) && is_array($card['hit_bonus']) ? $card['hit_bonus'] : [];
     ?>
     <article class="gachasoku-campaign-card">
       <?php if (!empty($card['image'])) : ?>
@@ -2157,6 +2314,33 @@ function gachasoku_render_campaign_cards($items, $args = []) {
             <?php endif; ?>
             <?php if (!empty($card['chance_link'])) : ?>
               <a class="gachasoku-button gachasoku-button--ghost" href="<?php echo esc_url($card['chance_link']); ?>" target="_blank" rel="noopener noreferrer">倍率アップ条件を確認する</a>
+            <?php endif; ?>
+          </div>
+        <?php endif; ?>
+        <?php if (!empty($hit_bonus['enabled'])) :
+          $bonus_multiplier = isset($hit_bonus['multiplier']) ? max(1, intval($hit_bonus['multiplier'])) : 1;
+          $bonus_start_label = '';
+          if (!empty($hit_bonus['start_local'])) {
+            $bonus_start_label = gachasoku_format_datetime(gachasoku_datetime_local_to_mysql($hit_bonus['start_local']));
+          }
+          $bonus_end_label = '';
+          if (!empty($hit_bonus['end_local'])) {
+            $bonus_end_label = gachasoku_format_datetime(gachasoku_datetime_local_to_mysql($hit_bonus['end_local']));
+          }
+          $bonus_period = '';
+          if ($bonus_start_label && $bonus_end_label) {
+            $bonus_period = sprintf('対象期間：%s 〜 %s', $bonus_start_label, $bonus_end_label);
+          } elseif ($bonus_start_label) {
+            $bonus_period = sprintf('対象期間：%s 〜', $bonus_start_label);
+          } elseif ($bonus_end_label) {
+            $bonus_period = sprintf('対象期間：〜 %s', $bonus_end_label);
+          }
+          ?>
+          <div class="gachasoku-campaign-card__hit-bonus">
+            <strong>みんなのガチャ投稿ボーナス</strong>
+            <p>期間中に「みんなのガチャ投稿」をすると抽選倍率が×<?php echo esc_html($bonus_multiplier); ?>になります。</p>
+            <?php if ($bonus_period !== '') : ?>
+              <p class="gachasoku-campaign-card__hit-bonus-period"><?php echo esc_html($bonus_period); ?></p>
             <?php endif; ?>
           </div>
         <?php endif; ?>
@@ -2435,6 +2619,14 @@ function gachasoku_update_campaign_chance_weights($campaign_id, $weights) {
 function gachasoku_select_campaign_winners($campaign_id, $max_winners) {
   global $wpdb;
   $table = $wpdb->prefix . 'gachasoku_campaign_entries';
+  $bonus_context = gachasoku_get_campaign_hit_bonus_context($campaign_id, null, true);
+  $bonus_multiplier = ($bonus_context['enabled'] && isset($bonus_context['multiplier'])) ? max(1, intval($bonus_context['multiplier'])) : 1;
+  $bonus_lookup = [];
+  if ($bonus_multiplier > 1 && !empty($bonus_context['member_ids'])) {
+    foreach ($bonus_context['member_ids'] as $member_id) {
+      $bonus_lookup[intval($member_id)] = true;
+    }
+  }
   $rows = $wpdb->get_results($wpdb->prepare("SELECT user_id, chance_weight FROM {$table} WHERE campaign_id = %d AND status = %s", $campaign_id, 'applied'), ARRAY_A);
   if (empty($rows)) {
     return [];
@@ -2448,9 +2640,14 @@ function gachasoku_select_campaign_winners($campaign_id, $max_winners) {
 
   $pool = [];
   foreach ($rows as $row) {
+    $user_id = intval($row['user_id']);
+    $weight = max(1, intval($row['chance_weight']));
+    if ($bonus_multiplier > 1 && isset($bonus_lookup[$user_id])) {
+      $weight *= $bonus_multiplier;
+    }
     $pool[] = [
-      'user_id' => intval($row['user_id']),
-      'weight' => max(1, intval($row['chance_weight'])),
+      'user_id' => $user_id,
+      'weight' => $weight,
     ];
   }
 
@@ -3195,6 +3392,53 @@ function gachasoku_attach_hit_post_labels($posts) {
   unset($post);
 
   return $posts;
+}
+
+function gachasoku_get_hit_post_member_ids($args = []) {
+  global $wpdb;
+
+  $defaults = [
+    'status'         => 'published',
+    'updated_after'  => '',
+    'updated_before' => '',
+  ];
+
+  $args = wp_parse_args($args, $defaults);
+
+  $table = gachasoku_get_hit_posts_table();
+  $where = [];
+  $params = [];
+
+  if ($args['status'] !== '' && $args['status'] !== null) {
+    $where[] = 'status = %s';
+    $params[] = sanitize_key($args['status']);
+  }
+
+  $after = gachasoku_datetime_local_to_mysql($args['updated_after']);
+  if ($after !== '') {
+    $where[] = 'updated_at >= %s';
+    $params[] = $after;
+  }
+
+  $before = gachasoku_datetime_local_to_mysql($args['updated_before']);
+  if ($before !== '') {
+    $where[] = 'updated_at <= %s';
+    $params[] = $before;
+  }
+
+  $sql = "SELECT DISTINCT member_id FROM {$table}";
+  if (!empty($where)) {
+    $sql .= ' WHERE ' . implode(' AND ', $where);
+  }
+
+  $query = $params ? $wpdb->prepare($sql, $params) : $sql;
+  $results = $wpdb->get_col($query);
+
+  if (empty($results)) {
+    return [];
+  }
+
+  return array_values(array_unique(array_map('intval', $results)));
 }
 
 function gachasoku_get_hit_posts($args = []) {
@@ -4086,6 +4330,14 @@ function gachasoku_render_draw_admin_page() {
       $entries_waiting = gachasoku_get_campaign_entry_count($selected_campaign_id, 'applied');
       $entries = gachasoku_get_campaign_entries_with_members($selected_campaign_id);
       $last_logs = gachasoku_get_campaign_winner_logs($selected_campaign_id);
+      $bonus_context = gachasoku_get_campaign_hit_bonus_context($selected_campaign_id, $fields, true);
+      $bonus_multiplier = ($bonus_context['enabled'] && isset($bonus_context['multiplier'])) ? max(1, intval($bonus_context['multiplier'])) : 1;
+      $bonus_lookup = [];
+      if ($bonus_multiplier > 1 && !empty($bonus_context['member_ids'])) {
+        foreach ($bonus_context['member_ids'] as $bonus_member_id) {
+          $bonus_lookup[intval($bonus_member_id)] = true;
+        }
+      }
       ?>
       <div class="gachasoku-draw-admin__list">
         <section class="gachasoku-draw-admin__item">
@@ -4147,6 +4399,8 @@ function gachasoku_render_draw_admin_page() {
                         $weight_value = max(1, intval($entry['chance_weight']));
                         $input_name = 'chance_weight[' . intval($entry['user_id']) . ']';
                         $is_editable = ($entry['status'] === 'applied');
+                        $entry_user_id = intval($entry['user_id']);
+                        $bonus_applied = ($bonus_multiplier > 1 && isset($bonus_lookup[$entry_user_id]));
                         ?>
                         <tr class="<?php echo $is_editable ? '' : 'is-disabled'; ?>" data-chance-row>
                           <td class="gachasoku-draw-admin__chance-select">
@@ -4161,6 +4415,9 @@ function gachasoku_render_draw_admin_page() {
                               <input type="number" name="<?php echo esc_attr($input_name); ?>" min="1" max="10" value="<?php echo esc_attr($weight_value); ?>" data-chance-input />
                             <?php else : ?>
                               <span class="gachasoku-draw-admin__chance-value"><?php echo esc_html($weight_value); ?></span>
+                            <?php endif; ?>
+                            <?php if ($bonus_applied) : ?>
+                              <span class="gachasoku-draw-admin__chance-bonus">投稿ボーナス ×<?php echo esc_html($bonus_multiplier); ?></span>
                             <?php endif; ?>
                           </td>
                           <td><?php echo esc_html(gachasoku_format_datetime($entry['applied_at'])); ?></td>

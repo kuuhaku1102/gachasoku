@@ -168,6 +168,14 @@
   font-weight: 600;
 }
 
+.gachasoku-draw-admin__chance-bonus {
+  display: block;
+  margin-top: 4px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #b91c1c;
+}
+
 .gachasoku-draw-admin__actions {
   margin-top: 18px;
   display: flex;
