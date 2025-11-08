@@ -114,13 +114,13 @@
 
   function openEntry($entry) {
     $entry.addClass('is-open');
-    $entry.find('.gachasoku-calendar-entry__body').prop('hidden', false);
+    $entry.find('.gachasoku-calendar-entry__body').removeAttr('hidden');
     $entry.find('.gachasoku-calendar-entry__toggle').attr('aria-expanded', 'true');
   }
 
   function closeEntry($entry) {
     $entry.removeClass('is-open');
-    $entry.find('.gachasoku-calendar-entry__body').prop('hidden', true);
+    $entry.find('.gachasoku-calendar-entry__body').attr('hidden', 'hidden');
     $entry.find('.gachasoku-calendar-entry__toggle').attr('aria-expanded', 'false');
   }
 
@@ -195,7 +195,7 @@
       var $entry = $(this).closest('.gachasoku-calendar-entry');
       var $clone = $entry.clone(false);
       $clone.removeClass('is-open');
-      $clone.find('.gachasoku-calendar-entry__body').prop('hidden', true);
+      $clone.find('.gachasoku-calendar-entry__body').attr('hidden', 'hidden');
       $clone.find('.gachasoku-calendar-entry__toggle').attr('aria-expanded', 'false');
       $entry.after($clone);
       updateEntryNumbers($entries);
