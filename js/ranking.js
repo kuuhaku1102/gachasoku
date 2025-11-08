@@ -38,14 +38,21 @@
       const losses = stats.losses || 0;
       const logpos = stats.logpos || 0;
       const winRate = stats.formatted || '0.0%';
+      const favorites = payload.favorites || {};
       const winEl = statsContainer.querySelector('[data-stat="wins"]');
       const lossEl = statsContainer.querySelector('[data-stat="losses"]');
       const logpoEl = statsContainer.querySelector('[data-stat="logpos"]');
       const rateEl = statsContainer.querySelector('[data-stat="win-rate"]');
+      const favoriteEl = statsContainer.querySelector('[data-stat="favorites"]');
       if (winEl) { winEl.textContent = formatNumber(wins); }
       if (lossEl) { lossEl.textContent = formatNumber(losses); }
       if (logpoEl) { logpoEl.textContent = formatNumber(logpos); }
       if (rateEl) { rateEl.textContent = winRate; }
+      if (favoriteEl) {
+        const total = typeof favorites.total === 'number' ? favorites.total : parseFloat(favorites.total || 0);
+        const safeTotal = Number.isNaN(total) ? 0 : total;
+        favoriteEl.textContent = formatNumber(safeTotal);
+      }
     }
 
     const personalContainer = document.querySelector('[data-ranking-personal="' + entryId + '"]');

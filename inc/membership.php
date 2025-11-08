@@ -702,6 +702,104 @@ function gachasoku_get_member_favorite_labels($favorite_ids, $entries = null) {
   return $labels;
 }
 
+function gachasoku_get_ranking_favorite_counts($entry_ids = []) {
+  global $wpdb;
+
+  $entry_ids = array_values(array_filter(array_map('sanitize_key', (array) $entry_ids)));
+
+  if (empty($entry_ids) && function_exists('gachasoku_get_ranking_entries')) {
+    $entries = gachasoku_get_ranking_entries();
+    if (is_array($entries)) {
+      foreach ($entries as $entry) {
+        if (!is_array($entry) || empty($entry['id'])) {
+          continue;
+        }
+
+        $entry_id = sanitize_key($entry['id']);
+        if ($entry_id !== '') {
+          $entry_ids[] = $entry_id;
+        }
+      }
+    }
+    $entry_ids = array_values(array_unique($entry_ids));
+  }
+
+  if (empty($entry_ids)) {
+    return [];
+  }
+
+  $table = gachasoku_get_members_table();
+  $counts = array_fill_keys($entry_ids, 0);
+  $status = defined('GACHASOKU_MEMBER_STATUS_ACTIVE')
+    ? sanitize_key(GACHASOKU_MEMBER_STATUS_ACTIVE)
+    : 'active';
+
+  $placeholders = implode(',', array_fill(0, count($entry_ids), '%s'));
+  $params = array_merge([$status], $entry_ids);
+
+  $primary_sql = $wpdb->prepare(
+    "SELECT favorite_site_primary AS favorite_id, COUNT(*) AS total
+     FROM {$table}
+     WHERE status = %s
+       AND favorite_site_primary != ''
+       AND favorite_site_primary IN ($placeholders)
+     GROUP BY favorite_site_primary",
+    $params
+  );
+
+  $primary_counts = $wpdb->get_results($primary_sql, ARRAY_A);
+  if (is_array($primary_counts)) {
+    foreach ($primary_counts as $row) {
+      if (empty($row['favorite_id'])) {
+        continue;
+      }
+
+      $favorite_id = sanitize_key($row['favorite_id']);
+      if ($favorite_id === '') {
+        continue;
+      }
+
+      if (!isset($counts[$favorite_id])) {
+        $counts[$favorite_id] = 0;
+      }
+
+      $counts[$favorite_id] += intval($row['total']);
+    }
+  }
+
+  $secondary_sql = $wpdb->prepare(
+    "SELECT favorite_site_secondary AS favorite_id, COUNT(*) AS total
+     FROM {$table}
+     WHERE status = %s
+       AND favorite_site_secondary != ''
+       AND favorite_site_secondary IN ($placeholders)
+     GROUP BY favorite_site_secondary",
+    $params
+  );
+
+  $secondary_counts = $wpdb->get_results($secondary_sql, ARRAY_A);
+  if (is_array($secondary_counts)) {
+    foreach ($secondary_counts as $row) {
+      if (empty($row['favorite_id'])) {
+        continue;
+      }
+
+      $favorite_id = sanitize_key($row['favorite_id']);
+      if ($favorite_id === '') {
+        continue;
+      }
+
+      if (!isset($counts[$favorite_id])) {
+        $counts[$favorite_id] = 0;
+      }
+
+      $counts[$favorite_id] += intval($row['total']);
+    }
+  }
+
+  return apply_filters('gachasoku_ranking_favorite_counts', $counts, $entry_ids);
+}
+
 function gachasoku_member_meets_favorite_requirement($member_id, $required_ids) {
   $required = array_values(array_filter(array_map('sanitize_key', (array) $required_ids)));
   if (empty($required)) {
