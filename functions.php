@@ -411,6 +411,9 @@ function gachasoku_get_sorted_ranking_entries($member_id = null) {
   }
   $member_id = intval($member_id);
   $member_totals = $member_id > 0 ? gachasoku_get_member_ranking_vote_totals($member_id, $entry_ids) : [];
+  $favorite_counts = function_exists('gachasoku_get_ranking_favorite_counts')
+    ? gachasoku_get_ranking_favorite_counts($entry_ids)
+    : [];
 
   foreach ($entries as &$entry) {
     $entry_id = $entry['id'];
@@ -448,6 +451,10 @@ function gachasoku_get_sorted_ranking_entries($member_id = null) {
         'formatted' => number_format_i18n(0, 1) . '%',
       ];
     }
+
+    $favorite_total = isset($favorite_counts[$entry_id]) ? intval($favorite_counts[$entry_id]) : 0;
+    $entry['favorite_count'] = $favorite_total;
+    $entry['favorite_count_formatted'] = number_format_i18n($favorite_total);
   }
   unset($entry);
 
@@ -552,6 +559,8 @@ function gachasoku_render_ranking_list($entries = null, $args = []) {
       $has_body = $name || $content;
       $stats = isset($entry['vote_stats']) ? $entry['vote_stats'] : ['wins' => 0, 'losses' => 0, 'logpos' => 0, 'formatted' => '0.0%'];
       $member_stats = isset($entry['member_vote_stats']) ? $entry['member_vote_stats'] : ['wins' => 0, 'losses' => 0, 'logpos' => 0, 'formatted' => '0.0%'];
+      $favorite_total = isset($entry['favorite_count']) ? intval($entry['favorite_count']) : 0;
+      $favorite_formatted = isset($entry['favorite_count_formatted']) ? $entry['favorite_count_formatted'] : number_format_i18n($favorite_total);
       $vote_nonce = $entry_id ? wp_create_nonce('gachasoku_ranking_vote_' . $entry_id) : '';
       $card_classes = ['ranking-card'];
       if ($rank_label) {
@@ -612,6 +621,13 @@ function gachasoku_render_ranking_list($entries = null, $args = []) {
               <div class="ranking-card__metric ranking-card__metric--rate">
                 <span class="ranking-card__metric-label">勝率</span>
                 <span class="ranking-card__metric-value" data-stat="win-rate"><?php echo esc_html($stats['formatted']); ?></span>
+              </div>
+              <div class="ranking-card__metric ranking-card__metric--favorite">
+                <span class="ranking-card__metric-label">推し人数</span>
+                <span class="ranking-card__metric-value ranking-card__metric-value--favorite">
+                  <span data-stat="favorites"><?php echo esc_html($favorite_formatted); ?></span>
+                  <span class="ranking-card__metric-unit">人</span>
+                </span>
               </div>
             </div>
             <?php if ($member_logged_in) : ?>
@@ -760,6 +776,11 @@ function gachasoku_ajax_ranking_vote() {
         continue;
       }
 
+      $favorite_total = isset($ranking_entry['favorite_count']) ? intval($ranking_entry['favorite_count']) : 0;
+      $favorite_formatted = isset($ranking_entry['favorite_count_formatted'])
+        ? $ranking_entry['favorite_count_formatted']
+        : number_format_i18n($favorite_total);
+
       $ranking_payload[$ranking_entry_id] = [
         'rank'  => isset($ranking_entry['current_rank']) ? intval($ranking_entry['current_rank']) : 0,
         'label' => isset($ranking_entry['current_rank_label']) ? $ranking_entry['current_rank_label'] : '',
@@ -777,6 +798,10 @@ function gachasoku_ajax_ranking_vote() {
           'win_rate'  => isset($ranking_entry['member_vote_stats']['win_rate']) ? floatval($ranking_entry['member_vote_stats']['win_rate']) : gachasoku_calculate_win_rate(intval($ranking_entry['member_vote_stats']['wins']), intval($ranking_entry['member_vote_stats']['losses'])),
           'formatted' => isset($ranking_entry['member_vote_stats']['formatted']) ? $ranking_entry['member_vote_stats']['formatted'] : number_format_i18n(0, 1) . '%',
         ] : [],
+        'favorites' => [
+          'total'     => $favorite_total,
+          'formatted' => $favorite_formatted,
+        ],
       ];
     }
   }
@@ -797,6 +822,11 @@ function gachasoku_ajax_ranking_vote() {
     'formatted' => number_format_i18n($member_rate, 1) . '%',
   ];
 
+  $response_favorites = [
+    'total'     => 0,
+    'formatted' => number_format_i18n(0),
+  ];
+
   if (isset($ranking_payload[$entry_id])) {
     if (!empty($ranking_payload[$entry_id]['stats'])) {
       $response_stats = array_merge($response_stats, $ranking_payload[$entry_id]['stats']);
@@ -804,12 +834,22 @@ function gachasoku_ajax_ranking_vote() {
     if (!empty($ranking_payload[$entry_id]['member'])) {
       $response_member = array_merge($response_member, $ranking_payload[$entry_id]['member']);
     }
+    if (!empty($ranking_payload[$entry_id]['favorites'])) {
+      $favorite_payload = $ranking_payload[$entry_id]['favorites'];
+      $favorite_total = isset($favorite_payload['total']) ? intval($favorite_payload['total']) : 0;
+      $favorite_formatted = isset($favorite_payload['formatted']) ? $favorite_payload['formatted'] : number_format_i18n($favorite_total);
+      $response_favorites = [
+        'total'     => $favorite_total,
+        'formatted' => $favorite_formatted,
+      ];
+    }
   }
 
   wp_send_json_success([
     'entryId' => $entry_id,
     'stats'   => $response_stats,
     'member'  => $response_member,
+    'favorites' => $response_favorites,
     'ranking' => $ranking_payload,
     'cooldown' => HOUR_IN_SECONDS,
     'message'  => '投票ありがとうございました。',

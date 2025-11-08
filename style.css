@@ -693,6 +693,22 @@ main {
   color: #d97706;
 }
 
+.ranking-card__metric--favorite .ranking-card__metric-value {
+  color: #2563eb;
+}
+
+.ranking-card__metric-value--favorite {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.ranking-card__metric-unit {
+  font-size: 0.75rem;
+  color: #64748b;
+  font-weight: 600;
+}
+
 .ranking-card__personal {
   border: 1px solid #e2e8f0;
   border-radius: 12px;
