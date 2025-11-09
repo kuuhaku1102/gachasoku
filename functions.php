@@ -497,6 +497,22 @@ function gachasoku_render_ranking_list($entries = null, $args = []) {
     $entries = gachasoku_get_sorted_ranking_entries();
   }
 
+  $entry_ids = [];
+  if (!empty($entries) && is_array($entries)) {
+    foreach ($entries as $entry) {
+      if (!empty($entry['id'])) {
+        $entry_ids[] = sanitize_key($entry['id']);
+      }
+    }
+  }
+
+  $latest_voice_map = [];
+  if (!empty($entry_ids) && function_exists('gachasoku_get_latest_hit_posts_map')) {
+    $latest_voice_map = gachasoku_get_latest_hit_posts_map($entry_ids, [
+      'status' => 'published',
+    ]);
+  }
+
   $defaults = [
     'list_class' => 'ranking-list',
     'item_class' => 'ranking-list__item',
@@ -568,6 +584,26 @@ function gachasoku_render_ranking_list($entries = null, $args = []) {
       }
       if (!$image_url) {
         $card_classes[] = 'ranking-card--no-image';
+      }
+      $voice_post = ($entry_id && isset($latest_voice_map[$entry_id])) ? $latest_voice_map[$entry_id] : null;
+      $voice_content = '';
+      $voice_author = '';
+      $voice_display_time = '';
+      $voice_datetime_attr = '';
+      if ($voice_post) {
+        $voice_author = !empty($voice_post['member_name']) ? sanitize_text_field($voice_post['member_name']) : '';
+        $voice_updated = isset($voice_post['updated_at']) ? $voice_post['updated_at'] : '';
+        if ($voice_updated) {
+          $voice_display_time = gachasoku_format_datetime($voice_updated);
+          $voice_datetime_attr = mysql2date('c', $voice_updated);
+        }
+        if (!empty($voice_post['content'])) {
+          if (function_exists('gachasoku_format_hit_post_content')) {
+            $voice_content = gachasoku_format_hit_post_content($voice_post['content']);
+          } else {
+            $voice_content = wpautop(esc_html($voice_post['content']));
+          }
+        }
       }
       ?>
         <li class="<?php echo esc_attr($args['item_class']); ?>">
@@ -675,6 +711,28 @@ function gachasoku_render_ranking_list($entries = null, $args = []) {
                 </div>
               </div>
             <?php endif; ?>
+            <div class="ranking-card__voice">
+              <h4 class="ranking-card__voice-title">最新のユーザーの声</h4>
+              <?php if ($voice_post && ($voice_content !== '' || $voice_author !== '' || ($voice_display_time && $voice_datetime_attr))) : ?>
+                <div class="ranking-card__voice-body">
+                  <?php if ($voice_content !== '') : ?>
+                    <?php echo $voice_content; ?>
+                  <?php endif; ?>
+                  <?php if ($voice_author !== '' || ($voice_display_time && $voice_datetime_attr)) : ?>
+                    <div class="ranking-card__voice-meta">
+                      <?php if ($voice_author !== '') : ?>
+                        <span class="ranking-card__voice-author"><?php echo esc_html($voice_author); ?>さん</span>
+                      <?php endif; ?>
+                      <?php if ($voice_display_time && $voice_datetime_attr) : ?>
+                        <time class="ranking-card__voice-time" datetime="<?php echo esc_attr($voice_datetime_attr); ?>"><?php echo esc_html($voice_display_time); ?></time>
+                      <?php endif; ?>
+                    </div>
+                  <?php endif; ?>
+                </div>
+              <?php else : ?>
+                <p class="ranking-card__voice-empty">まだ投稿がありません。</p>
+              <?php endif; ?>
+            </div>
           </article>
         </li>
         <?php endforeach; ?>
