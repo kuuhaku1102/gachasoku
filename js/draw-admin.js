@@ -1,10 +1,6 @@
 (function () {
   document.addEventListener('DOMContentLoaded', function () {
     var sections = document.querySelectorAll('.gachasoku-draw-admin__chance');
-    if (!sections.length) {
-      return;
-    }
-
     sections.forEach(function (section) {
       var selectAll = section.querySelector('[data-chance-select-all]');
       var checkboxes = Array.prototype.slice.call(section.querySelectorAll('[data-chance-select]'));
@@ -106,6 +102,99 @@
       }
 
       updateSelectAll();
+    });
+
+    var forms = document.querySelectorAll('.gachasoku-draw-admin__form');
+    forms.forEach(function (form) {
+      var runButton = form.querySelector('button[name="gachasoku_draw_action"][value="run"]');
+      if (!runButton) {
+        return;
+      }
+
+      var submitterFallback = null;
+      var isDelayComplete = false;
+      var countdownTimer = null;
+      var remainingSeconds = 0;
+      var status = form.querySelector('[data-draw-status]');
+      var actions = form.querySelector('.gachasoku-draw-admin__actions');
+
+      if (!status && actions) {
+        status = document.createElement('p');
+        status.className = 'gachasoku-draw-admin__status';
+        status.setAttribute('data-draw-status', '');
+        status.setAttribute('aria-live', 'polite');
+        actions.appendChild(status);
+      }
+
+      var updateStatus = function () {
+        if (!status) {
+          return;
+        }
+        if (remainingSeconds > 0) {
+          status.textContent = '抽選中です…（あと約' + remainingSeconds + '秒）';
+        } else {
+          status.textContent = '結果を表示しています…';
+        }
+      };
+
+      form.querySelectorAll('button[type="submit"]').forEach(function (button) {
+        button.addEventListener('click', function () {
+          submitterFallback = button;
+        });
+      });
+
+      form.addEventListener('submit', function (event) {
+        var submitter = event.submitter || submitterFallback;
+
+        if (isDelayComplete) {
+          isDelayComplete = false;
+          submitterFallback = null;
+          return;
+        }
+
+        if (!submitter || submitter !== runButton) {
+          submitterFallback = null;
+          return;
+        }
+
+        event.preventDefault();
+
+        var buttons = form.querySelectorAll('button[type="submit"]');
+        buttons.forEach(function (button) {
+          button.disabled = true;
+        });
+
+        var delay = 10000 + Math.floor(Math.random() * 5000);
+        remainingSeconds = Math.ceil(delay / 1000);
+        updateStatus();
+
+        if (countdownTimer) {
+          window.clearInterval(countdownTimer);
+        }
+
+        countdownTimer = window.setInterval(function () {
+          remainingSeconds -= 1;
+          if (remainingSeconds <= 0) {
+            window.clearInterval(countdownTimer);
+            countdownTimer = null;
+          }
+          updateStatus();
+        }, 1000);
+
+        window.setTimeout(function () {
+          if (countdownTimer) {
+            window.clearInterval(countdownTimer);
+            countdownTimer = null;
+          }
+          remainingSeconds = 0;
+          updateStatus();
+          isDelayComplete = true;
+          buttons.forEach(function (button) {
+            button.disabled = false;
+          });
+          form.submit();
+        }, delay);
+      });
     });
   });
 })();
