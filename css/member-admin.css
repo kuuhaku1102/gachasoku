@@ -117,7 +117,7 @@
 .gachasoku-draw-admin__chance-table {
   width: 100%;
   border-collapse: collapse;
-  min-width: 520px;
+  min-width: 680px;
 }
 
 .gachasoku-draw-admin__chance-table th,
@@ -145,6 +145,47 @@
 .gachasoku-draw-admin__chance-table td.gachasoku-draw-admin__chance-select input[type="checkbox"] {
   width: 18px;
   height: 18px;
+}
+
+.gachasoku-draw-admin__favorite-history-cell {
+  min-width: 220px;
+}
+
+.gachasoku-draw-admin__favorite-history-list {
+  margin: 0;
+  padding-left: 18px;
+  list-style: disc;
+  color: #1f2937;
+}
+
+.gachasoku-draw-admin__favorite-history-list li {
+  margin-bottom: 4px;
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+
+.gachasoku-draw-admin__favorite-history-slot {
+  font-weight: 600;
+  color: #2563eb;
+  margin-right: 6px;
+}
+
+.gachasoku-draw-admin__favorite-history-name {
+  font-weight: 600;
+}
+
+.gachasoku-draw-admin__favorite-history-range {
+  display: block;
+  color: #4b5563;
+}
+
+.gachasoku-draw-admin__favorite-history-empty {
+  color: #9ca3af;
+}
+
+.gachasoku-draw-admin__favorite-history-more {
+  color: #6b7280;
+  font-style: italic;
 }
 
 .gachasoku-draw-admin__chance-table tr.is-disabled {

@@ -14,7 +14,7 @@ if (!defined('GACHASOKU_MEMBER_STATUS_WITHDRAWN')) {
 }
 
 if (!defined('GACHASOKU_MEMBERSHIP_DB_VERSION')) {
-  define('GACHASOKU_MEMBERSHIP_DB_VERSION', '2.4.0');
+  define('GACHASOKU_MEMBERSHIP_DB_VERSION', '2.5.0');
 }
 
 if (!defined('GACHASOKU_MEMBERSHIP_PAGES_VERSION')) {
@@ -45,6 +45,31 @@ function gachasoku_get_members_table() {
 function gachasoku_get_member_sessions_table() {
   global $wpdb;
   return $wpdb->prefix . 'gachasoku_member_sessions';
+}
+
+function gachasoku_get_member_favorite_logs_table() {
+  global $wpdb;
+  return $wpdb->prefix . 'gachasoku_member_favorite_logs';
+}
+
+function gachasoku_member_favorite_logs_table_exists($force_refresh = false) {
+  global $wpdb;
+
+  static $exists = null;
+  if ($force_refresh) {
+    $exists = null;
+  }
+
+  if ($exists !== null) {
+    return $exists;
+  }
+
+  $table = gachasoku_get_member_favorite_logs_table();
+  $like = $wpdb->esc_like($table);
+  $found = $wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $like));
+  $exists = ($found === $table);
+
+  return $exists;
 }
 
 function gachasoku_get_hit_posts_table() {
@@ -499,6 +524,8 @@ function gachasoku_update_member($member_id, $data) {
     return new WP_Error('member_not_found', '会員が見つかりません。');
   }
 
+  $previous_slots = gachasoku_get_member_favorite_slots($member);
+
   $allowed = [
     'name',
     'email',
@@ -566,6 +593,23 @@ function gachasoku_update_member($member_id, $data) {
 
   if ($result === false) {
     return new WP_Error('member_update_failed', '会員情報の更新に失敗しました。');
+  }
+
+  $favorite_changed = array_key_exists('favorite_site_primary', $update) || array_key_exists('favorite_site_secondary', $update);
+  if ($favorite_changed) {
+    $new_slots = $previous_slots;
+
+    if (array_key_exists('favorite_site_primary', $update)) {
+      $new_slots['primary'] = sanitize_key($update['favorite_site_primary']);
+    }
+    if (array_key_exists('favorite_site_secondary', $update)) {
+      $new_slots['secondary'] = sanitize_key($update['favorite_site_secondary']);
+    }
+    if (array_key_exists('favorite_updated_at', $update)) {
+      $new_slots['updated_at'] = $update['favorite_updated_at'] ? $update['favorite_updated_at'] : '';
+    }
+
+    gachasoku_sync_member_favorite_history($member['id'], $previous_slots, $new_slots);
   }
 
   return true;
@@ -800,10 +844,31 @@ function gachasoku_get_ranking_favorite_counts($entry_ids = []) {
   return apply_filters('gachasoku_ranking_favorite_counts', $counts, $entry_ids);
 }
 
-function gachasoku_member_meets_favorite_requirement($member_id, $required_ids) {
+function gachasoku_member_meets_favorite_requirement($member_id, $required_ids, $period = []) {
+  $member_id = intval($member_id);
+  if (!$member_id) {
+    return false;
+  }
+
   $required = array_values(array_filter(array_map('sanitize_key', (array) $required_ids)));
   if (empty($required)) {
     return true;
+  }
+
+  $period = is_array($period) ? $period : [];
+  $start = isset($period['start']) ? sanitize_text_field($period['start']) : '';
+  $end = isset($period['end']) ? sanitize_text_field($period['end']) : '';
+
+  $has_period = false;
+  if ($start && strtotime($start)) {
+    $has_period = true;
+  }
+  if ($end && strtotime($end)) {
+    $has_period = true;
+  }
+
+  if ($has_period) {
+    return gachasoku_member_had_favorite_in_period($member_id, $required, $start, $end);
   }
 
   $favorites = gachasoku_get_member_favorite_ids($member_id);
@@ -1071,6 +1136,7 @@ function gachasoku_membership_tables_exist($force_refresh = false) {
   $required_tables = [
     gachasoku_get_members_table(),
     gachasoku_get_member_sessions_table(),
+    gachasoku_get_member_favorite_logs_table(),
   ];
 
   foreach ($required_tables as $table) {
@@ -1099,6 +1165,7 @@ function gachasoku_install_membership_tables() {
   $charset_collate = $wpdb->get_charset_collate();
   $members_table = gachasoku_get_members_table();
   $sessions_table = gachasoku_get_member_sessions_table();
+  $favorite_logs_table = gachasoku_get_member_favorite_logs_table();
   $entries_table = $wpdb->prefix . 'gachasoku_campaign_entries';
   $logs_table = $wpdb->prefix . 'gachasoku_campaign_draw_logs';
   $votes_table = $wpdb->prefix . 'gachasoku_ranking_votes';
@@ -1188,18 +1255,359 @@ function gachasoku_install_membership_tables() {
     UNIQUE KEY member_entry (member_id, entry_id(64))
   ) {$charset_collate};";
 
+  $favorite_logs_sql = "CREATE TABLE {$favorite_logs_table} (
+    id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+    member_id bigint(20) unsigned NOT NULL,
+    favorite_id varchar(191) NOT NULL,
+    slot varchar(20) NOT NULL,
+    started_at datetime NOT NULL,
+    ended_at datetime DEFAULT NULL,
+    PRIMARY KEY  (id),
+    KEY member_slot (member_id, slot),
+    KEY favorite_id (favorite_id(64)),
+    KEY period (started_at, ended_at)
+  ) {$charset_collate};";
+
   dbDelta($members_sql);
   dbDelta($sessions_sql);
   dbDelta($entries_sql);
   dbDelta($logs_sql);
   dbDelta($votes_sql);
   dbDelta($hits_sql);
+  dbDelta($favorite_logs_sql);
 
   gachasoku_membership_tables_exist(true);
+  gachasoku_member_favorite_logs_table_exists(true);
 
   gachasoku_migrate_existing_wp_members();
 
+  gachasoku_backfill_member_favorite_history();
+
   update_option('gachasoku_membership_db_version', GACHASOKU_MEMBERSHIP_DB_VERSION);
+}
+
+function gachasoku_backfill_member_favorite_history() {
+  if (!gachasoku_member_favorite_logs_table_exists()) {
+    return;
+  }
+
+  global $wpdb;
+
+  $logs_table = gachasoku_get_member_favorite_logs_table();
+  $members_table = gachasoku_get_members_table();
+
+  $existing = $wpdb->get_var("SELECT COUNT(*) FROM {$logs_table}");
+  if ($existing && intval($existing) > 0) {
+    return;
+  }
+
+  $members = $wpdb->get_results(
+    "SELECT id, favorite_site_primary, favorite_site_secondary, favorite_updated_at, created_at FROM {$members_table}",
+    ARRAY_A
+  );
+
+  if (empty($members)) {
+    return;
+  }
+
+  foreach ($members as $member) {
+    $member_id = isset($member['id']) ? intval($member['id']) : 0;
+    if (!$member_id) {
+      continue;
+    }
+
+    $primary = isset($member['favorite_site_primary']) ? sanitize_key($member['favorite_site_primary']) : '';
+    $secondary = isset($member['favorite_site_secondary']) ? sanitize_key($member['favorite_site_secondary']) : '';
+
+    if ($primary === '' && $secondary === '') {
+      continue;
+    }
+
+    $started_at = '';
+    if (!empty($member['favorite_updated_at'])) {
+      $started_at = sanitize_text_field($member['favorite_updated_at']);
+    } elseif (!empty($member['created_at'])) {
+      $started_at = sanitize_text_field($member['created_at']);
+    }
+
+    if ($started_at === '' || !strtotime($started_at)) {
+      $started_at = current_time('mysql');
+    }
+
+    if ($primary !== '') {
+      $wpdb->insert(
+        $logs_table,
+        [
+          'member_id' => $member_id,
+          'favorite_id' => $primary,
+          'slot' => 'primary',
+          'started_at' => $started_at,
+          'ended_at' => null,
+        ],
+        ['%d', '%s', '%s', '%s', '%s']
+      );
+    }
+
+    if ($secondary !== '' && $secondary !== $primary) {
+      $wpdb->insert(
+        $logs_table,
+        [
+          'member_id' => $member_id,
+          'favorite_id' => $secondary,
+          'slot' => 'secondary',
+          'started_at' => $started_at,
+          'ended_at' => null,
+        ],
+        ['%d', '%s', '%s', '%s', '%s']
+      );
+    }
+  }
+}
+
+function gachasoku_open_member_favorite_log($member_id, $slot, $favorite_id, $started_at = '') {
+  if (!gachasoku_member_favorite_logs_table_exists()) {
+    return;
+  }
+
+  global $wpdb;
+
+  $member_id = intval($member_id);
+  $favorite_id = sanitize_key($favorite_id);
+  $slot = ($slot === 'secondary') ? 'secondary' : 'primary';
+
+  if (!$member_id || $favorite_id === '') {
+    return;
+  }
+
+  $table = gachasoku_get_member_favorite_logs_table();
+  $timestamp = ($started_at && strtotime($started_at)) ? date('Y-m-d H:i:s', strtotime($started_at)) : current_time('mysql');
+
+  $existing = $wpdb->get_var($wpdb->prepare(
+    "SELECT id FROM {$table} WHERE member_id = %d AND slot = %s AND favorite_id = %s AND ended_at IS NULL LIMIT 1",
+    $member_id,
+    $slot,
+    $favorite_id
+  ));
+
+  if ($existing) {
+    $wpdb->update(
+      $table,
+      ['started_at' => $timestamp],
+      ['id' => intval($existing)],
+      ['%s'],
+      ['%d']
+    );
+    return;
+  }
+
+  $wpdb->insert(
+    $table,
+    [
+      'member_id' => $member_id,
+      'favorite_id' => $favorite_id,
+      'slot' => $slot,
+      'started_at' => $timestamp,
+      'ended_at' => null,
+    ],
+    ['%d', '%s', '%s', '%s', '%s']
+  );
+}
+
+function gachasoku_close_member_favorite_log($member_id, $slot, $favorite_id, $ended_at = '') {
+  if (!gachasoku_member_favorite_logs_table_exists()) {
+    return;
+  }
+
+  global $wpdb;
+
+  $member_id = intval($member_id);
+  $favorite_id = sanitize_key($favorite_id);
+  $slot = ($slot === 'secondary') ? 'secondary' : 'primary';
+
+  if (!$member_id || $favorite_id === '') {
+    return;
+  }
+
+  $table = gachasoku_get_member_favorite_logs_table();
+  $timestamp = ($ended_at && strtotime($ended_at)) ? date('Y-m-d H:i:s', strtotime($ended_at)) : current_time('mysql');
+
+  $wpdb->query($wpdb->prepare(
+    "UPDATE {$table} SET ended_at = %s WHERE member_id = %d AND slot = %s AND favorite_id = %s AND ended_at IS NULL",
+    $timestamp,
+    $member_id,
+    $slot,
+    $favorite_id
+  ));
+}
+
+function gachasoku_sync_member_favorite_history($member_id, $previous_slots, $new_slots) {
+  if (!gachasoku_member_favorite_logs_table_exists()) {
+    return;
+  }
+
+  $member_id = intval($member_id);
+  if (!$member_id) {
+    return;
+  }
+
+  $previous = is_array($previous_slots) ? $previous_slots : [];
+  $current = is_array($new_slots) ? $new_slots : [];
+
+  $change_time = '';
+  if (!empty($current['updated_at']) && strtotime($current['updated_at'])) {
+    $change_time = $current['updated_at'];
+  }
+  if ($change_time === '') {
+    $change_time = current_time('mysql');
+  }
+
+  foreach (['primary', 'secondary'] as $slot_key) {
+    $previous_id = isset($previous[$slot_key]) ? sanitize_key($previous[$slot_key]) : '';
+    $current_id = isset($current[$slot_key]) ? sanitize_key($current[$slot_key]) : '';
+
+    if ($previous_id !== '' && $previous_id !== $current_id) {
+      gachasoku_close_member_favorite_log($member_id, $slot_key, $previous_id, $change_time);
+    }
+
+    if ($current_id !== '' && $current_id !== $previous_id) {
+      gachasoku_open_member_favorite_log($member_id, $slot_key, $current_id, $change_time);
+    }
+  }
+}
+
+function gachasoku_member_had_favorite_in_period($member_id, $favorite_ids, $start = '', $end = '') {
+  $favorite_ids = array_values(array_filter(array_map('sanitize_key', (array) $favorite_ids)));
+  if (empty($favorite_ids)) {
+    return false;
+  }
+
+  if (!gachasoku_member_favorite_logs_table_exists()) {
+    $current = gachasoku_get_member_favorite_ids($member_id);
+    return !empty(array_intersect($favorite_ids, $current));
+  }
+
+  global $wpdb;
+
+  $member_id = intval($member_id);
+  if (!$member_id) {
+    return false;
+  }
+
+  $table = gachasoku_get_member_favorite_logs_table();
+  $conditions = ['member_id = %d'];
+  $params = [$member_id];
+
+  $placeholders = implode(',', array_fill(0, count($favorite_ids), '%s'));
+  $conditions[] = "favorite_id IN ({$placeholders})";
+  $params = array_merge($params, $favorite_ids);
+
+  if ($end && strtotime($end)) {
+    $conditions[] = 'started_at <= %s';
+    $params[] = date('Y-m-d H:i:s', strtotime($end));
+  }
+
+  if ($start && strtotime($start)) {
+    $conditions[] = '(ended_at IS NULL OR ended_at >= %s)';
+    $params[] = date('Y-m-d H:i:s', strtotime($start));
+  }
+
+  $where = implode(' AND ', $conditions);
+  $sql = "SELECT 1 FROM {$table} WHERE {$where} LIMIT 1";
+  $prepared = $wpdb->prepare($sql, $params);
+  $exists = $wpdb->get_var($prepared);
+
+  if ($exists) {
+    return true;
+  }
+
+  if ((!$start || !strtotime($start)) && (!$end || !strtotime($end))) {
+    $current = gachasoku_get_member_favorite_ids($member_id);
+    return !empty(array_intersect($favorite_ids, $current));
+  }
+
+  return false;
+}
+
+function gachasoku_get_member_favorite_history($member_id, $args = []) {
+  if (!gachasoku_member_favorite_logs_table_exists()) {
+    return [];
+  }
+
+  $member_id = intval($member_id);
+  if (!$member_id) {
+    return [];
+  }
+
+  global $wpdb;
+
+  $defaults = [
+    'orderby' => 'started_at',
+    'order' => 'DESC',
+    'limit' => 0,
+  ];
+  $args = wp_parse_args($args, $defaults);
+
+  $allowed_orderby = ['started_at', 'ended_at'];
+  $orderby = in_array($args['orderby'], $allowed_orderby, true) ? $args['orderby'] : 'started_at';
+  $order = strtoupper($args['order']) === 'ASC' ? 'ASC' : 'DESC';
+  $limit = intval($args['limit']);
+
+  $table = gachasoku_get_member_favorite_logs_table();
+  $sql = $wpdb->prepare("SELECT * FROM {$table} WHERE member_id = %d ORDER BY {$orderby} {$order}", $member_id);
+  if ($limit > 0) {
+    $sql .= ' LIMIT ' . $limit;
+  }
+
+  $results = $wpdb->get_results($sql, ARRAY_A);
+  return $results ? $results : [];
+}
+
+function gachasoku_get_member_favorite_history_map($member_ids, $args = []) {
+  if (!gachasoku_member_favorite_logs_table_exists()) {
+    return [];
+  }
+
+  $member_ids = array_values(array_filter(array_map('intval', (array) $member_ids)));
+  $member_ids = array_values(array_unique($member_ids));
+  if (empty($member_ids)) {
+    return [];
+  }
+
+  global $wpdb;
+
+  $defaults = [
+    'orderby' => 'started_at',
+    'order' => 'DESC',
+  ];
+  $args = wp_parse_args($args, $defaults);
+
+  $allowed_orderby = ['started_at', 'ended_at'];
+  $orderby = in_array($args['orderby'], $allowed_orderby, true) ? $args['orderby'] : 'started_at';
+  $order = strtoupper($args['order']) === 'ASC' ? 'ASC' : 'DESC';
+
+  $table = gachasoku_get_member_favorite_logs_table();
+  $placeholders = implode(',', array_fill(0, count($member_ids), '%d'));
+  $sql = "SELECT * FROM {$table} WHERE member_id IN ({$placeholders}) ORDER BY {$orderby} {$order}";
+  $prepared = call_user_func_array([$wpdb, 'prepare'], array_merge([$sql], $member_ids));
+  $results = $wpdb->get_results($prepared, ARRAY_A);
+
+  if (empty($results)) {
+    return [];
+  }
+
+  $grouped = [];
+  foreach ($results as $row) {
+    $key = isset($row['member_id']) ? intval($row['member_id']) : 0;
+    if (!$key) {
+      continue;
+    }
+    if (!isset($grouped[$key])) {
+      $grouped[$key] = [];
+    }
+    $grouped[$key][] = $row;
+  }
+
+  return $grouped;
 }
 
 function gachasoku_migrate_existing_wp_members() {
@@ -1328,6 +1736,8 @@ function gachasoku_render_campaign_meta_box($post) {
     $hit_bonus_weight = 2;
   }
   $favorite_entries = isset($fields['favorite_entries']) ? array_map('sanitize_key', (array) $fields['favorite_entries']) : [];
+  $favorite_period_start = isset($fields['favorite_period_start']) ? $fields['favorite_period_start'] : '';
+  $favorite_period_end = isset($fields['favorite_period_end']) ? $fields['favorite_period_end'] : '';
   $ranking_entries = function_exists('gachasoku_get_ranking_entries') ? gachasoku_get_ranking_entries() : [];
   $entry_count = gachasoku_get_campaign_entry_count($post->ID);
 
@@ -1455,6 +1865,17 @@ function gachasoku_render_campaign_meta_box($post) {
             <?php endforeach; ?>
           </fieldset>
           <p class="description">選択した推しサイトを設定している会員のみ応募できます。未選択の場合は制限なしです。</p>
+          <div class="gachasoku-campaign-meta__favorite-period">
+            <label>
+              対象期間（開始）
+              <input type="datetime-local" name="gachasoku_campaign_favorite_period_start" value="<?php echo esc_attr($favorite_period_start); ?>" />
+            </label>
+            <label>
+              対象期間（終了）
+              <input type="datetime-local" name="gachasoku_campaign_favorite_period_end" value="<?php echo esc_attr($favorite_period_end); ?>" />
+            </label>
+            <p class="description">指定期間に推し登録していた会員のみ応募対象となります。未入力の場合は現在の推し設定で判定します。</p>
+          </div>
         <?php else : ?>
           <p class="description">ランキングが未設定のため推しサイト制限は利用できません。</p>
         <?php endif; ?>
@@ -1476,6 +1897,8 @@ function gachasoku_get_campaign_fields($campaign_id) {
     $raw_favorites = $raw_favorites !== '' && $raw_favorites !== null ? [$raw_favorites] : [];
   }
   $favorite_entries = array_values(array_filter(array_map('sanitize_key', $raw_favorites)));
+  $favorite_period_start = gachasoku_sanitize_datetime_local(get_post_meta($campaign_id, '_gachasoku_campaign_favorite_period_start', true));
+  $favorite_period_end = gachasoku_sanitize_datetime_local(get_post_meta($campaign_id, '_gachasoku_campaign_favorite_period_end', true));
 
   return [
     'link' => get_post_meta($campaign_id, '_gachasoku_campaign_link', true),
@@ -1491,6 +1914,8 @@ function gachasoku_get_campaign_fields($campaign_id) {
     'hit_bonus_end' => get_post_meta($campaign_id, '_gachasoku_campaign_hit_bonus_end', true),
     'hit_bonus_weight' => intval(get_post_meta($campaign_id, '_gachasoku_campaign_hit_bonus_weight', true)),
     'favorite_entries' => $favorite_entries,
+    'favorite_period_start' => $favorite_period_start,
+    'favorite_period_end' => $favorite_period_end,
   ];
 }
 
@@ -1535,6 +1960,8 @@ function gachasoku_save_campaign_meta($post_id) {
     }
   }
   $favorite_entries = array_values(array_unique($favorite_entries));
+  $favorite_period_start = isset($_POST['gachasoku_campaign_favorite_period_start']) ? gachasoku_sanitize_datetime_local($_POST['gachasoku_campaign_favorite_period_start']) : '';
+  $favorite_period_end = isset($_POST['gachasoku_campaign_favorite_period_end']) ? gachasoku_sanitize_datetime_local($_POST['gachasoku_campaign_favorite_period_end']) : '';
 
   update_post_meta($post_id, '_gachasoku_campaign_link', $link);
   update_post_meta($post_id, '_gachasoku_campaign_image_id', $image_id);
@@ -1586,6 +2013,18 @@ function gachasoku_save_campaign_meta($post_id) {
     update_post_meta($post_id, '_gachasoku_campaign_favorites', $favorite_entries);
   } else {
     delete_post_meta($post_id, '_gachasoku_campaign_favorites');
+  }
+
+  if ($favorite_period_start !== '') {
+    update_post_meta($post_id, '_gachasoku_campaign_favorite_period_start', $favorite_period_start);
+  } else {
+    delete_post_meta($post_id, '_gachasoku_campaign_favorite_period_start');
+  }
+
+  if ($favorite_period_end !== '') {
+    update_post_meta($post_id, '_gachasoku_campaign_favorite_period_end', $favorite_period_end);
+  } else {
+    delete_post_meta($post_id, '_gachasoku_campaign_favorite_period_end');
   }
 }
 
@@ -2149,8 +2588,18 @@ function gachasoku_register_campaign_entry($campaign_id, $user_id) {
   }
 
   $fields = gachasoku_get_campaign_fields($campaign_id);
-  if (!gachasoku_member_meets_favorite_requirement($user_id, isset($fields['favorite_entries']) ? $fields['favorite_entries'] : [])) {
-    return new WP_Error('campaign_ineligible', '推しサイトの条件を満たしていないため応募できません。');
+  $favorite_entries = isset($fields['favorite_entries']) ? $fields['favorite_entries'] : [];
+  $favorite_period = [
+    'start' => gachasoku_datetime_local_to_mysql(isset($fields['favorite_period_start']) ? $fields['favorite_period_start'] : ''),
+    'end' => gachasoku_datetime_local_to_mysql(isset($fields['favorite_period_end']) ? $fields['favorite_period_end'] : ''),
+  ];
+  if (!gachasoku_member_meets_favorite_requirement($user_id, $favorite_entries, $favorite_period)) {
+    $message = '推しサイトの条件を満たしていないため応募できません。';
+    $period_label = gachasoku_format_favorite_period_label($favorite_period['start'], $favorite_period['end']);
+    if ($period_label !== '') {
+      $message .= ' ' . $period_label;
+    }
+    return new WP_Error('campaign_ineligible', $message);
   }
 
   $now = current_time('mysql');
@@ -2280,6 +2729,11 @@ function gachasoku_get_campaign_card_data($campaign_id) {
     $ranking_entries = function_exists('gachasoku_get_ranking_entries') ? gachasoku_get_ranking_entries() : [];
     $favorite_labels = gachasoku_get_member_favorite_labels($favorite_entries, $ranking_entries);
   }
+  $favorite_period_start_local = isset($fields['favorite_period_start']) ? $fields['favorite_period_start'] : '';
+  $favorite_period_end_local = isset($fields['favorite_period_end']) ? $fields['favorite_period_end'] : '';
+  $favorite_period_start = gachasoku_datetime_local_to_mysql($favorite_period_start_local);
+  $favorite_period_end = gachasoku_datetime_local_to_mysql($favorite_period_end_local);
+  $favorite_period_label = gachasoku_format_favorite_period_label($favorite_period_start, $favorite_period_end);
 
   $hit_bonus = gachasoku_get_campaign_hit_bonus_context($campaign_id, $fields, false);
 
@@ -2301,6 +2755,13 @@ function gachasoku_get_campaign_card_data($campaign_id) {
     'is_finished' => gachasoku_is_campaign_finished($campaign_id),
     'favorite_entries' => $favorite_entries,
     'favorite_labels' => $favorite_labels,
+    'favorite_period' => [
+      'start' => $favorite_period_start,
+      'end' => $favorite_period_end,
+      'start_local' => $favorite_period_start_local,
+      'end_local' => $favorite_period_end_local,
+      'label' => $favorite_period_label,
+    ],
     'hit_bonus' => $hit_bonus,
   ];
 }
@@ -2317,6 +2778,12 @@ function gachasoku_build_campaign_item($campaign_id, $member_id = 0) {
   }
 
   $favorite_entries = isset($card['favorite_entries']) ? array_values(array_filter(array_map('sanitize_key', (array) $card['favorite_entries']))) : [];
+  $favorite_period = isset($card['favorite_period']) && is_array($card['favorite_period']) ? $card['favorite_period'] : [];
+  $favorite_period_args = [
+    'start' => isset($favorite_period['start']) ? $favorite_period['start'] : '',
+    'end' => isset($favorite_period['end']) ? $favorite_period['end'] : '',
+  ];
+  $favorite_period_label = isset($favorite_period['label']) ? $favorite_period['label'] : '';
   $eligible = true;
   $eligibility_message = '';
 
@@ -2328,13 +2795,19 @@ function gachasoku_build_campaign_item($campaign_id, $member_id = 0) {
         $labels = $favorite_entries;
       }
       $eligibility_message = sprintf('推しサイト「%s」を推している会員のみ応募できます。ログイン後に推しサイトを設定してください。', implode(' / ', $labels));
-    } elseif (!gachasoku_member_meets_favorite_requirement($member_id, $favorite_entries)) {
+      if ($favorite_period_label !== '') {
+        $eligibility_message .= ' ' . $favorite_period_label;
+      }
+    } elseif (!gachasoku_member_meets_favorite_requirement($member_id, $favorite_entries, $favorite_period_args)) {
       $eligible = false;
       $labels = array_values($card['favorite_labels']);
       if (empty($labels)) {
         $labels = $favorite_entries;
       }
       $eligibility_message = sprintf('推しサイト「%s」を推している会員のみ応募できます。マイページで推しサイトを確認してください。', implode(' / ', $labels));
+      if ($favorite_period_label !== '') {
+        $eligibility_message .= ' ' . $favorite_period_label;
+      }
     }
   }
 
@@ -2470,6 +2943,9 @@ function gachasoku_render_campaign_cards($items, $args = []) {
                 <li><?php echo esc_html($label); ?></li>
               <?php endforeach; ?>
             </ul>
+            <?php if (!empty($card['favorite_period']['label'])) : ?>
+              <p class="gachasoku-campaign-card__favorites-period"><?php echo esc_html($card['favorite_period']['label']); ?></p>
+            <?php endif; ?>
           </div>
         <?php endif; ?>
         <?php if (!empty($card['content'])) : ?>
@@ -3053,6 +3529,11 @@ function gachasoku_render_member_favorite_section($member, $entries = null) {
   $labels_map = gachasoku_get_member_favorite_labels($favorite_ids, $entries);
   $primary_label = $slots['primary'] !== '' && isset($labels_map[$slots['primary']]) ? $labels_map[$slots['primary']] : '';
   $secondary_label = $slots['secondary'] !== '' && isset($labels_map[$slots['secondary']]) ? $labels_map[$slots['secondary']] : '';
+  $history = gachasoku_get_member_favorite_history($member['id'], [
+    'orderby' => 'started_at',
+    'order' => 'DESC',
+  ]);
+  $history_html = gachasoku_render_member_favorite_history($history, $entries);
 
   $remaining = gachasoku_member_favorites_cooldown_remaining($member);
   $can_update = $remaining <= 0;
@@ -3139,8 +3620,113 @@ function gachasoku_render_member_favorite_section($member, $entries = null) {
       <?php else : ?>
         <p class="gachasoku-dashboard__favorites-empty">推しサイトはまだ設定されていません。</p>
       <?php endif; ?>
+      <div class="gachasoku-dashboard__favorites-history">
+        <h3 class="gachasoku-dashboard__favorites-heading">推しサイト履歴</h3>
+        <?php echo $history_html; ?>
+      </div>
     </div>
   </section>
+  <?php
+  return ob_get_clean();
+}
+
+function gachasoku_render_member_favorite_history($history, $entries = null) {
+  $history = is_array($history) ? $history : [];
+
+  if (empty($history)) {
+    return '<p class="gachasoku-dashboard__favorites-history-empty">推しサイトの履歴はまだありません。</p>';
+  }
+
+  $favorite_ids = [];
+  foreach ($history as $row) {
+    if (isset($row['favorite_id'])) {
+      $favorite_ids[] = sanitize_key($row['favorite_id']);
+    }
+  }
+  $labels_map = gachasoku_get_member_favorite_labels($favorite_ids, $entries);
+
+  ob_start();
+  ?>
+  <ul class="gachasoku-dashboard__favorites-history-list">
+    <?php foreach ($history as $row) :
+      $favorite_id = isset($row['favorite_id']) ? sanitize_key($row['favorite_id']) : '';
+      $slot = (isset($row['slot']) && $row['slot'] === 'secondary') ? '推しサイト2' : '推しサイト1';
+      $label = ($favorite_id !== '' && isset($labels_map[$favorite_id])) ? $labels_map[$favorite_id] : $favorite_id;
+      $started_at = isset($row['started_at']) ? $row['started_at'] : '';
+      $ended_at = isset($row['ended_at']) ? $row['ended_at'] : '';
+      $started_attr = $started_at ? mysql2date('c', $started_at) : '';
+      $ended_attr = $ended_at ? mysql2date('c', $ended_at) : '';
+      $started_label = $started_at ? gachasoku_format_datetime($started_at) : '';
+      $ended_label = $ended_at ? gachasoku_format_datetime($ended_at) : '';
+      $is_active = !$ended_at;
+      ?>
+      <li class="gachasoku-dashboard__favorites-history-item">
+        <div class="gachasoku-dashboard__favorites-history-head">
+          <span class="gachasoku-dashboard__favorites-history-slot"><?php echo esc_html($slot); ?></span>
+          <span class="gachasoku-dashboard__favorites-history-name"><?php echo esc_html($label); ?></span>
+        </div>
+        <div class="gachasoku-dashboard__favorites-history-period">
+          <?php if ($started_label) : ?>
+            <time datetime="<?php echo esc_attr($started_attr); ?>"><?php echo esc_html($started_label); ?></time>
+          <?php else : ?>
+            <span>—</span>
+          <?php endif; ?>
+          <span class="gachasoku-dashboard__favorites-history-separator">〜</span>
+          <?php if ($is_active) : ?>
+            <span class="gachasoku-dashboard__favorites-history-current">継続中</span>
+          <?php elseif ($ended_label) : ?>
+            <time datetime="<?php echo esc_attr($ended_attr); ?>"><?php echo esc_html($ended_label); ?></time>
+          <?php else : ?>
+            <span>—</span>
+          <?php endif; ?>
+        </div>
+      </li>
+    <?php endforeach; ?>
+  </ul>
+  <?php
+  return ob_get_clean();
+}
+
+function gachasoku_render_admin_favorite_history($history, $entries = null) {
+  $history = is_array($history) ? $history : [];
+
+  if (empty($history)) {
+    return '<span class="gachasoku-draw-admin__favorite-history-empty">履歴なし</span>';
+  }
+
+  $total = count($history);
+  $limited = array_slice($history, 0, 5);
+  $has_more = $total > count($limited);
+  $favorite_ids = [];
+  foreach ($limited as $row) {
+    if (isset($row['favorite_id'])) {
+      $favorite_ids[] = sanitize_key($row['favorite_id']);
+    }
+  }
+  $labels_map = gachasoku_get_member_favorite_labels($favorite_ids, $entries);
+
+  ob_start();
+  ?>
+  <ul class="gachasoku-draw-admin__favorite-history-list">
+    <?php foreach ($limited as $row) :
+      $favorite_id = isset($row['favorite_id']) ? sanitize_key($row['favorite_id']) : '';
+      $slot = (isset($row['slot']) && $row['slot'] === 'secondary') ? '推し2' : '推し1';
+      $label = ($favorite_id !== '' && isset($labels_map[$favorite_id])) ? $labels_map[$favorite_id] : $favorite_id;
+      $started_at = isset($row['started_at']) ? $row['started_at'] : '';
+      $ended_at = isset($row['ended_at']) ? $row['ended_at'] : '';
+      $started_label = $started_at ? gachasoku_format_datetime($started_at) : '—';
+      $ended_label = $ended_at ? gachasoku_format_datetime($ended_at) : '継続中';
+      ?>
+      <li>
+        <span class="gachasoku-draw-admin__favorite-history-slot"><?php echo esc_html($slot); ?></span>
+        <span class="gachasoku-draw-admin__favorite-history-name"><?php echo esc_html($label); ?></span>
+        <span class="gachasoku-draw-admin__favorite-history-range"><?php echo esc_html($started_label . ' 〜 ' . $ended_label); ?></span>
+      </li>
+    <?php endforeach; ?>
+    <?php if ($has_more) : ?>
+      <li class="gachasoku-draw-admin__favorite-history-more">他 <?php echo esc_html($total - count($limited)); ?> 件</li>
+    <?php endif; ?>
+  </ul>
   <?php
   return ob_get_clean();
 }
@@ -3412,6 +3998,32 @@ function gachasoku_format_datetime($datetime) {
     return $datetime;
   }
   return date_i18n('Y年n月j日 H:i', $timestamp);
+}
+
+function gachasoku_format_favorite_period_label($start, $end) {
+  $start_label = '';
+  if ($start && strtotime($start)) {
+    $start_label = gachasoku_format_datetime($start);
+  }
+
+  $end_label = '';
+  if ($end && strtotime($end)) {
+    $end_label = gachasoku_format_datetime($end);
+  }
+
+  if ($start_label && $end_label) {
+    return sprintf('推し登録対象期間：%s 〜 %s', $start_label, $end_label);
+  }
+
+  if ($start_label) {
+    return sprintf('推し登録対象期間：%s 〜', $start_label);
+  }
+
+  if ($end_label) {
+    return sprintf('推し登録対象期間：〜 %s', $end_label);
+  }
+
+  return '';
 }
 
 function gachasoku_translate_entry_status($status) {
@@ -4436,6 +5048,21 @@ function gachasoku_render_draw_admin_page() {
           $bonus_lookup[intval($bonus_member_id)] = true;
         }
       }
+      $history_entries = function_exists('gachasoku_get_ranking_entries') ? gachasoku_get_ranking_entries() : [];
+      $history_member_ids = [];
+      if (!empty($entries)) {
+        foreach ($entries as $history_entry) {
+          if (isset($history_entry['user_id'])) {
+            $history_member_ids[] = intval($history_entry['user_id']);
+          }
+        }
+      }
+      if (!empty($history_member_ids)) {
+        $history_member_ids = array_values(array_unique($history_member_ids));
+      }
+      $favorite_history_map = !empty($history_member_ids)
+        ? gachasoku_get_member_favorite_history_map($history_member_ids)
+        : [];
       ?>
       <div class="gachasoku-draw-admin__list">
         <section class="gachasoku-draw-admin__item">
@@ -4485,6 +5112,7 @@ function gachasoku_render_draw_admin_page() {
                       <tr>
                         <th class="column-select"><input type="checkbox" data-chance-select-all aria-label="すべて選択" /></th>
                         <th>会員</th>
+                        <th>推し履歴</th>
                         <th>ステータス</th>
                         <th>倍率</th>
                         <th>応募日時</th>
@@ -4499,6 +5127,8 @@ function gachasoku_render_draw_admin_page() {
                         $is_editable = ($entry['status'] === 'applied');
                         $entry_user_id = intval($entry['user_id']);
                         $bonus_applied = ($bonus_multiplier > 1 && isset($bonus_lookup[$entry_user_id]));
+                        $history_rows = isset($favorite_history_map[$entry_user_id]) ? $favorite_history_map[$entry_user_id] : [];
+                        $history_cell = gachasoku_render_admin_favorite_history($history_rows, $history_entries);
                         ?>
                         <tr class="<?php echo $is_editable ? '' : 'is-disabled'; ?>" data-chance-row>
                           <td class="gachasoku-draw-admin__chance-select">
@@ -4506,6 +5136,9 @@ function gachasoku_render_draw_admin_page() {
                           </td>
                           <td>
                             <?php echo esc_html($display_name); ?>
+                          </td>
+                          <td class="gachasoku-draw-admin__favorite-history-cell">
+                            <?php echo $history_cell; ?>
                           </td>
                           <td><?php echo esc_html($label); ?></td>
                           <td>
