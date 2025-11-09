@@ -82,6 +82,25 @@
   color: #0f172a;
 }
 
+.gachasoku-campaign-meta__favorite-period {
+  margin-top: 12px;
+  display: grid;
+  gap: 12px 18px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
+.gachasoku-campaign-meta__favorite-period label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.gachasoku-campaign-meta__favorite-period input {
+  width: 100%;
+}
+
 .gachasoku-campaign-meta__hit-bonus-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));

@@ -2507,6 +2507,12 @@ main {
   color: #f97316;
 }
 
+.gachasoku-campaign-card__favorites-period {
+  margin: 8px 0 0;
+  font-size: 0.85rem;
+  color: #1d4ed8;
+}
+
 .gachasoku-campaign-card__content {
   font-size: 0.98rem;
   color: #374151;
@@ -2899,6 +2905,67 @@ main {
   margin: 0;
   font-size: 0.9rem;
   color: #64748b;
+}
+
+.gachasoku-dashboard__favorites-history {
+  margin-top: 18px;
+  display: grid;
+  gap: 10px;
+}
+
+.gachasoku-dashboard__favorites-history-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 10px;
+}
+
+.gachasoku-dashboard__favorites-history-item {
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: #f1f5f9;
+  border: 1px solid rgba(148, 163, 184, 0.4);
+}
+
+.gachasoku-dashboard__favorites-history-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.gachasoku-dashboard__favorites-history-slot {
+  color: #2563eb;
+}
+
+.gachasoku-dashboard__favorites-history-period {
+  margin-top: 6px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+  color: #475569;
+}
+
+.gachasoku-dashboard__favorites-history-period time {
+  font-variant-numeric: tabular-nums;
+}
+
+.gachasoku-dashboard__favorites-history-separator {
+  color: #94a3b8;
+}
+
+.gachasoku-dashboard__favorites-history-current {
+  font-weight: 600;
+  color: #16a34a;
+}
+
+.gachasoku-dashboard__favorites-history-empty {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #94a3b8;
 }
 
 .gachasoku-dashboard__vote-disabled {
