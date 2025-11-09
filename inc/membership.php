@@ -4104,6 +4104,80 @@ function gachasoku_attach_hit_post_labels($posts) {
   return $posts;
 }
 
+function gachasoku_get_latest_hit_posts_map($entry_ids, $args = []) {
+  global $wpdb;
+
+  if (empty($entry_ids) || !is_array($entry_ids)) {
+    return [];
+  }
+
+  $entry_ids = array_values(array_filter(array_map('sanitize_key', $entry_ids)));
+  if (empty($entry_ids)) {
+    return [];
+  }
+
+  $defaults = [
+    'status' => 'published',
+  ];
+
+  $args = wp_parse_args($args, $defaults);
+  $status = $args['status'];
+  $status = ($status === '' || $status === null) ? '' : sanitize_key($status);
+
+  $table = gachasoku_get_hit_posts_table();
+  $members_table = gachasoku_get_members_table();
+
+  $placeholders = implode(',', array_fill(0, count($entry_ids), '%s'));
+
+  $subquery_where = 'entry_id IN (' . $placeholders . ')';
+  $subquery_params = $entry_ids;
+  if ($status !== '') {
+    $subquery_where .= ' AND status = %s';
+    $subquery_params[] = $status;
+  }
+
+  $subquery = "SELECT entry_id, MAX(updated_at) AS latest_updated FROM {$table} WHERE {$subquery_where} GROUP BY entry_id";
+
+  $outer_where = 'p.entry_id IN (' . $placeholders . ')';
+  $outer_params = $entry_ids;
+  if ($status !== '') {
+    $outer_where .= ' AND p.status = %s';
+    $outer_params[] = $status;
+  }
+
+  $sql = "SELECT p.*, m.name AS member_name FROM {$table} p INNER JOIN ({$subquery}) latest ON p.entry_id = latest.entry_id AND p.updated_at = latest.latest_updated LEFT JOIN {$members_table} m ON p.member_id = m.id WHERE {$outer_where}";
+
+  $query = $wpdb->prepare($sql, array_merge($subquery_params, $outer_params));
+  $results = $wpdb->get_results($query, ARRAY_A);
+
+  if (empty($results)) {
+    return [];
+  }
+
+  $results = gachasoku_attach_hit_post_labels($results);
+
+  $map = [];
+  foreach ($results as $post) {
+    $entry_id = isset($post['entry_id']) ? $post['entry_id'] : '';
+    if ($entry_id === '') {
+      continue;
+    }
+
+    if (!isset($map[$entry_id])) {
+      $map[$entry_id] = $post;
+      continue;
+    }
+
+    $current_id = isset($map[$entry_id]['id']) ? intval($map[$entry_id]['id']) : 0;
+    $candidate_id = isset($post['id']) ? intval($post['id']) : 0;
+    if ($candidate_id > $current_id) {
+      $map[$entry_id] = $post;
+    }
+  }
+
+  return $map;
+}
+
 function gachasoku_get_hit_post_member_ids($args = []) {
   global $wpdb;
 
@@ -5048,21 +5122,6 @@ function gachasoku_render_draw_admin_page() {
           $bonus_lookup[intval($bonus_member_id)] = true;
         }
       }
-      $history_entries = function_exists('gachasoku_get_ranking_entries') ? gachasoku_get_ranking_entries() : [];
-      $history_member_ids = [];
-      if (!empty($entries)) {
-        foreach ($entries as $history_entry) {
-          if (isset($history_entry['user_id'])) {
-            $history_member_ids[] = intval($history_entry['user_id']);
-          }
-        }
-      }
-      if (!empty($history_member_ids)) {
-        $history_member_ids = array_values(array_unique($history_member_ids));
-      }
-      $favorite_history_map = !empty($history_member_ids)
-        ? gachasoku_get_member_favorite_history_map($history_member_ids)
-        : [];
       ?>
       <div class="gachasoku-draw-admin__list">
         <section class="gachasoku-draw-admin__item">
@@ -5112,7 +5171,6 @@ function gachasoku_render_draw_admin_page() {
                       <tr>
                         <th class="column-select"><input type="checkbox" data-chance-select-all aria-label="すべて選択" /></th>
                         <th>会員</th>
-                        <th>推し履歴</th>
                         <th>ステータス</th>
                         <th>倍率</th>
                         <th>応募日時</th>
@@ -5127,8 +5185,6 @@ function gachasoku_render_draw_admin_page() {
                         $is_editable = ($entry['status'] === 'applied');
                         $entry_user_id = intval($entry['user_id']);
                         $bonus_applied = ($bonus_multiplier > 1 && isset($bonus_lookup[$entry_user_id]));
-                        $history_rows = isset($favorite_history_map[$entry_user_id]) ? $favorite_history_map[$entry_user_id] : [];
-                        $history_cell = gachasoku_render_admin_favorite_history($history_rows, $history_entries);
                         ?>
                         <tr class="<?php echo $is_editable ? '' : 'is-disabled'; ?>" data-chance-row>
                           <td class="gachasoku-draw-admin__chance-select">
@@ -5136,9 +5192,6 @@ function gachasoku_render_draw_admin_page() {
                           </td>
                           <td>
                             <?php echo esc_html($display_name); ?>
-                          </td>
-                          <td class="gachasoku-draw-admin__favorite-history-cell">
-                            <?php echo $history_cell; ?>
                           </td>
                           <td><?php echo esc_html($label); ?></td>
                           <td>
