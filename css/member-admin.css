@@ -183,6 +183,13 @@
   gap: 10px;
 }
 
+.gachasoku-draw-admin__status {
+  flex-basis: 100%;
+  margin: 6px 0 0;
+  font-weight: 600;
+  color: #d97706;
+}
+
 .gachasoku-draw-admin__empty {
   margin: 12px 0 0;
   color: #6b7280;
