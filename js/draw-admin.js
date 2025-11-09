@@ -113,8 +113,9 @@
 
       var submitterFallback = null;
       var isDelayComplete = false;
-      var countdownTimer = null;
-      var remainingSeconds = 0;
+      var statusPulseTimer = null;
+      var statusPulseFrame = 0;
+      var statusPulseFrames = ['抽選中です…', '抽選中です..', '抽選中です.'];
       var status = form.querySelector('[data-draw-status]');
       var actions = form.querySelector('.gachasoku-draw-admin__actions');
 
@@ -126,15 +127,24 @@
         actions.appendChild(status);
       }
 
-      var updateStatus = function () {
+      var stopStatusPulse = function () {
+        if (statusPulseTimer) {
+          window.clearInterval(statusPulseTimer);
+          statusPulseTimer = null;
+        }
+      };
+
+      var startStatusPulse = function () {
         if (!status) {
           return;
         }
-        if (remainingSeconds > 0) {
-          status.textContent = '抽選中です…（あと約' + remainingSeconds + '秒）';
-        } else {
-          status.textContent = '結果を表示しています…';
-        }
+        stopStatusPulse();
+        statusPulseFrame = 0;
+        status.textContent = statusPulseFrames[statusPulseFrame];
+        statusPulseTimer = window.setInterval(function () {
+          statusPulseFrame = (statusPulseFrame + 1) % statusPulseFrames.length;
+          status.textContent = statusPulseFrames[statusPulseFrame];
+        }, 500);
       };
 
       form.querySelectorAll('button[type="submit"]').forEach(function (button) {
@@ -165,29 +175,13 @@
         });
 
         var delay = 10000 + Math.floor(Math.random() * 5000);
-        remainingSeconds = Math.ceil(delay / 1000);
-        updateStatus();
-
-        if (countdownTimer) {
-          window.clearInterval(countdownTimer);
-        }
-
-        countdownTimer = window.setInterval(function () {
-          remainingSeconds -= 1;
-          if (remainingSeconds <= 0) {
-            window.clearInterval(countdownTimer);
-            countdownTimer = null;
-          }
-          updateStatus();
-        }, 1000);
+        startStatusPulse();
 
         window.setTimeout(function () {
-          if (countdownTimer) {
-            window.clearInterval(countdownTimer);
-            countdownTimer = null;
+          stopStatusPulse();
+          if (status) {
+            status.textContent = '結果を表示しています…';
           }
-          remainingSeconds = 0;
-          updateStatus();
           isDelayComplete = true;
           buttons.forEach(function (button) {
             button.disabled = false;
