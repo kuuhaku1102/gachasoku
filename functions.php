@@ -713,21 +713,9 @@ function gachasoku_render_ranking_list($entries = null, $args = []) {
             <?php endif; ?>
             <div class="ranking-card__voice">
               <h4 class="ranking-card__voice-title">最新のユーザーの声</h4>
-              <?php if ($voice_post && ($voice_content !== '' || $voice_author !== '' || ($voice_display_time && $voice_datetime_attr))) : ?>
+              <?php if ($voice_post && $voice_content !== '') : ?>
                 <div class="ranking-card__voice-body">
-                  <?php if ($voice_content !== '') : ?>
-                    <?php echo $voice_content; ?>
-                  <?php endif; ?>
-                  <?php if ($voice_author !== '' || ($voice_display_time && $voice_datetime_attr)) : ?>
-                    <div class="ranking-card__voice-meta">
-                      <?php if ($voice_author !== '') : ?>
-                        <span class="ranking-card__voice-author"><?php echo esc_html($voice_author); ?>さん</span>
-                      <?php endif; ?>
-                      <?php if ($voice_display_time && $voice_datetime_attr) : ?>
-                        <time class="ranking-card__voice-time" datetime="<?php echo esc_attr($voice_datetime_attr); ?>"><?php echo esc_html($voice_display_time); ?></time>
-                      <?php endif; ?>
-                    </div>
-                  <?php endif; ?>
+                  <?php echo $voice_content; ?>
                 </div>
               <?php else : ?>
                 <p class="ranking-card__voice-empty">まだ投稿がありません。</p>
