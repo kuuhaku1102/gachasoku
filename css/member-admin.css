@@ -25,6 +25,7 @@
   display: flex;
   gap: 12px;
   align-items: center;
+  flex-wrap: wrap;
 }
 
 .gachasoku-member-admin__filters input[type="search"],
@@ -35,6 +36,59 @@
 
 .gachasoku-hit-admin__filters select {
   min-width: 200px;
+}
+
+.gachasoku-hit-admin__filters input[type="date"] {
+  padding: 6px 10px;
+}
+
+.gachasoku-hit-admin__date-range {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  color: #374151;
+}
+
+.gachasoku-hit-admin__date-separator {
+  color: #6b7280;
+}
+
+.gachasoku-hit-admin__summary {
+  margin-bottom: 20px;
+  padding: 14px 18px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #f9fafb;
+  display: flex;
+  gap: 32px;
+  flex-wrap: wrap;
+}
+
+.gachasoku-hit-admin__summary-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 180px;
+}
+
+.gachasoku-hit-admin__summary-label {
+  font-size: 0.9rem;
+  color: #4b5563;
+  font-weight: 600;
+}
+
+.gachasoku-hit-admin__summary-value {
+  font-size: 1.6rem;
+  color: #111827;
+  font-weight: 700;
+}
+
+.gachasoku-hit-admin__summary-range {
+  display: block;
+  font-size: 0.8rem;
+  color: #6b7280;
+  font-weight: 500;
 }
 
 .gachasoku-member-admin__inline-form {

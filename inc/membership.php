@@ -4225,17 +4225,103 @@ function gachasoku_get_hit_post_member_ids($args = []) {
   return array_values(array_unique(array_map('intval', $results)));
 }
 
+function gachasoku_build_hit_post_query_parts($args = []) {
+  $defaults = [
+    'status'         => 'published',
+    'entry_id'       => '',
+    'entry_ids'      => [],
+    'member_id'      => 0,
+    'updated_after'  => '',
+    'updated_before' => '',
+  ];
+
+  $args = wp_parse_args($args, $defaults);
+
+  $filters = [
+    'status'         => ($args['status'] !== '' && $args['status'] !== null) ? sanitize_key($args['status']) : '',
+    'member_id'      => intval($args['member_id']) > 0 ? intval($args['member_id']) : 0,
+    'entry_ids'      => [],
+    'updated_after'  => gachasoku_datetime_local_to_mysql($args['updated_after']),
+    'updated_before' => gachasoku_datetime_local_to_mysql($args['updated_before']),
+  ];
+
+  if (!empty($args['entry_id'])) {
+    $filters['entry_ids'][] = sanitize_key($args['entry_id']);
+  }
+
+  if (!empty($args['entry_ids']) && is_array($args['entry_ids'])) {
+    foreach ($args['entry_ids'] as $entry_id) {
+      $filters['entry_ids'][] = sanitize_key($entry_id);
+    }
+  }
+
+  $filters['entry_ids'] = array_values(array_filter(array_unique($filters['entry_ids'])));
+
+  $where = [];
+  $params = [];
+
+  if ($filters['status'] !== '') {
+    $where[] = 'p.status = %s';
+    $params[] = $filters['status'];
+  }
+
+  if ($filters['member_id'] > 0) {
+    $where[] = 'p.member_id = %d';
+    $params[] = $filters['member_id'];
+  }
+
+  if (!empty($filters['entry_ids'])) {
+    $placeholders = implode(',', array_fill(0, count($filters['entry_ids']), '%s'));
+    $where[] = 'p.entry_id IN (' . $placeholders . ')';
+    $params = array_merge($params, $filters['entry_ids']);
+  }
+
+  if ($filters['updated_after'] !== '') {
+    $where[] = 'p.updated_at >= %s';
+    $params[] = $filters['updated_after'];
+  }
+
+  if ($filters['updated_before'] !== '') {
+    $where[] = 'p.updated_at <= %s';
+    $params[] = $filters['updated_before'];
+  }
+
+  return [
+    'where'   => $where,
+    'params'  => $params,
+    'filters' => $filters,
+  ];
+}
+
+function gachasoku_get_hit_post_count($args = []) {
+  global $wpdb;
+
+  $parts = gachasoku_build_hit_post_query_parts($args);
+  $table = gachasoku_get_hit_posts_table();
+
+  $sql = "SELECT COUNT(*) FROM {$table} p";
+  if (!empty($parts['where'])) {
+    $sql .= ' WHERE ' . implode(' AND ', $parts['where']);
+  }
+
+  $query = $parts['params'] ? $wpdb->prepare($sql, $parts['params']) : $sql;
+
+  return intval($wpdb->get_var($query));
+}
+
 function gachasoku_get_hit_posts($args = []) {
   global $wpdb;
 
   $defaults = [
-    'status'    => 'published',
-    'entry_id'  => '',
-    'entry_ids' => [],
-    'member_id' => 0,
-    'orderby'   => 'updated_at',
-    'order'     => 'DESC',
-    'limit'     => 0,
+    'status'         => 'published',
+    'entry_id'       => '',
+    'entry_ids'      => [],
+    'member_id'      => 0,
+    'updated_after'  => '',
+    'updated_before' => '',
+    'orderby'        => 'updated_at',
+    'order'          => 'DESC',
+    'limit'          => 0,
   ];
 
   $args = wp_parse_args($args, $defaults);
@@ -4243,35 +4329,9 @@ function gachasoku_get_hit_posts($args = []) {
   $table = gachasoku_get_hit_posts_table();
   $members_table = gachasoku_get_members_table();
 
-  $where = [];
-  $params = [];
-
-  if ($args['status'] !== '' && $args['status'] !== null) {
-    $where[] = 'p.status = %s';
-    $params[] = sanitize_key($args['status']);
-  }
-
-  $member_id = intval($args['member_id']);
-  if ($member_id > 0) {
-    $where[] = 'p.member_id = %d';
-    $params[] = $member_id;
-  }
-
-  $entry_ids = [];
-  if (!empty($args['entry_id'])) {
-    $entry_ids[] = sanitize_key($args['entry_id']);
-  }
-  if (!empty($args['entry_ids']) && is_array($args['entry_ids'])) {
-    foreach ($args['entry_ids'] as $entry_id) {
-      $entry_ids[] = sanitize_key($entry_id);
-    }
-  }
-  $entry_ids = array_values(array_filter(array_unique($entry_ids)));
-  if (!empty($entry_ids)) {
-    $placeholders = implode(',', array_fill(0, count($entry_ids), '%s'));
-    $where[] = 'p.entry_id IN (' . $placeholders . ')';
-    $params = array_merge($params, $entry_ids);
-  }
+  $parts = gachasoku_build_hit_post_query_parts($args);
+  $where = $parts['where'];
+  $params = $parts['params'];
 
   $sql = "SELECT p.*, m.name AS member_name FROM {$table} p LEFT JOIN {$members_table} m ON p.member_id = m.id";
   if ($where) {
@@ -4931,6 +4991,40 @@ function gachasoku_render_hit_posts_admin_page() {
   $entry_filter = isset($_GET['entry']) ? sanitize_text_field(wp_unslash($_GET['entry'])) : '';
   $entry_filter_key = $entry_filter !== '' ? sanitize_key($entry_filter) : '';
   $status_filter = isset($_GET['status']) ? sanitize_text_field(wp_unslash($_GET['status'])) : 'published';
+  $date_start = isset($_GET['date_start']) ? sanitize_text_field(wp_unslash($_GET['date_start'])) : '';
+  $date_end = isset($_GET['date_end']) ? sanitize_text_field(wp_unslash($_GET['date_end'])) : '';
+
+  if ($date_start !== '' && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $date_start)) {
+    $date_start = '';
+  }
+
+  if ($date_end !== '' && !preg_match('/^\d{4}-\d{2}-\d{2}$/', $date_end)) {
+    $date_end = '';
+  }
+
+  if ($date_start !== '' && $date_end !== '' && $date_start > $date_end) {
+    $tmp = $date_start;
+    $date_start = $date_end;
+    $date_end = $tmp;
+  }
+
+  $updated_after = '';
+  if ($date_start !== '') {
+    $start_timestamp = strtotime($date_start . ' 00:00:00');
+    if ($start_timestamp !== false) {
+      $updated_after = date_i18n('Y-m-d H:i:s', $start_timestamp, false);
+    }
+  }
+
+  $updated_before = '';
+  if ($date_end !== '') {
+    $end_timestamp = strtotime($date_end . ' 23:59:59');
+    if ($end_timestamp !== false) {
+      $updated_before = date_i18n('Y-m-d H:i:s', $end_timestamp, false);
+    }
+  }
+
+  $has_date_filter = ($updated_after !== '' || $updated_before !== '');
 
   $labels = gachasoku_get_hit_post_entry_labels();
 
@@ -4950,8 +5044,36 @@ function gachasoku_render_hit_posts_admin_page() {
     $query_args['status'] = sanitize_key($status_filter);
   }
 
+  if ($updated_after !== '') {
+    $query_args['updated_after'] = $updated_after;
+  }
+
+  if ($updated_before !== '') {
+    $query_args['updated_before'] = $updated_before;
+  }
+
   $posts = gachasoku_get_hit_posts($query_args);
   $posts = gachasoku_attach_hit_post_labels($posts);
+
+  $total_posts = gachasoku_get_hit_post_count(['status' => 'published']);
+
+  $count_args = [
+    'status'         => isset($query_args['status']) ? $query_args['status'] : 'published',
+    'entry_id'       => $entry_filter_key,
+    'updated_after'  => isset($query_args['updated_after']) ? $query_args['updated_after'] : '',
+    'updated_before' => isset($query_args['updated_before']) ? $query_args['updated_before'] : '',
+  ];
+
+  $filtered_count = $has_date_filter ? gachasoku_get_hit_post_count($count_args) : null;
+
+  $date_range_label = '';
+  if ($date_start !== '' && $date_end !== '') {
+    $date_range_label = $date_start . ' 〜 ' . $date_end;
+  } elseif ($date_start !== '') {
+    $date_range_label = $date_start . ' 以降';
+  } elseif ($date_end !== '') {
+    $date_range_label = $date_end . ' まで';
+  }
 
   ?>
   <div class="wrap gachasoku-hit-admin">
@@ -4968,10 +5090,34 @@ function gachasoku_render_hit_posts_admin_page() {
         <option value="published" <?php selected($status_filter, 'published'); ?>>公開のみ</option>
         <option value="all" <?php selected($status_filter, 'all'); ?>>すべての状態</option>
       </select>
+      <label class="gachasoku-hit-admin__date-range">
+        <span>期間</span>
+        <input type="date" name="date_start" value="<?php echo esc_attr($date_start); ?>" />
+        <span class="gachasoku-hit-admin__date-separator">〜</span>
+        <input type="date" name="date_end" value="<?php echo esc_attr($date_end); ?>" />
+      </label>
       <button type="submit" class="button">絞り込み</button>
     </form>
 
     <?php settings_errors('gachasoku_hit_admin'); ?>
+
+    <div class="gachasoku-hit-admin__summary">
+      <div class="gachasoku-hit-admin__summary-item">
+        <span class="gachasoku-hit-admin__summary-label">現在の投稿総数</span>
+        <span class="gachasoku-hit-admin__summary-value"><?php echo esc_html(number_format_i18n($total_posts)); ?></span>
+      </div>
+      <?php if ($has_date_filter) : ?>
+        <div class="gachasoku-hit-admin__summary-item">
+          <span class="gachasoku-hit-admin__summary-label">
+            選択期間内
+            <?php if ($date_range_label !== '') : ?>
+              <span class="gachasoku-hit-admin__summary-range"><?php echo esc_html($date_range_label); ?></span>
+            <?php endif; ?>
+          </span>
+          <span class="gachasoku-hit-admin__summary-value"><?php echo esc_html(number_format_i18n(intval($filtered_count))); ?></span>
+        </div>
+      <?php endif; ?>
+    </div>
 
     <table class="widefat fixed striped gachasoku-hit-admin__table">
       <thead>
