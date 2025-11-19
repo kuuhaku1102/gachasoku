@@ -15,7 +15,6 @@
     <?php endif; ?>
     <div class="site-footer__meta">
       <p>&copy; <?php echo date('Y'); ?> <?php bloginfo('name'); ?> All Rights Reserved.</p>
-      <p>Made with <span class="site-footer__heart" aria-hidden="true">💛</span> by <strong>InfinityDesign</strong></p>
     </div>
   </div>
 </footer>
