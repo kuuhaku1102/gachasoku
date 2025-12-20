@@ -3322,7 +3322,6 @@ main > :not(.single-post):not(.archive-section) {
   background: var(--white);
   border-radius: 20px;
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
-  overflow: hidden;
 }
 
 .single-post__header {
@@ -3373,7 +3372,6 @@ main > :not(.single-post):not(.archive-section) {
 
 .single-post__thumbnail {
   width: 100%;
-  overflow: hidden;
   position: relative;
 }
 
