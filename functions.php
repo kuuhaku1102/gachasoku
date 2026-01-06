@@ -2093,4 +2093,51 @@ function gachasoku_get_upcoming_calendar_events($limit = 10) {
   return $items;
 }
 
+// ========================================
+// SEO設定（2026年版準拠）
+// ========================================
+
+/**
+ * noindex設定ルール
+ * タグ、日付、著者アーカイブ、検索結果、ページネーション2ページ目以降、絞り込みURLをnoindex
+ */
+add_action('wp_head', 'gachasoku_seo_noindex_rules', 1);
+function gachasoku_seo_noindex_rules() {
+  // タグページ
+  if (is_tag()) {
+    echo '<meta name="robots" content="noindex, follow">' . "\n";
+    return;
+  }
+  
+  // 日付アーカイブ
+  if (is_date()) {
+    echo '<meta name="robots" content="noindex, follow">' . "\n";
+    return;
+  }
+  
+  // 著者アーカイブ
+  if (is_author()) {
+    echo '<meta name="robots" content="noindex, follow">' . "\n";
+    return;
+  }
+  
+  // 検索結果
+  if (is_search()) {
+    echo '<meta name="robots" content="noindex, follow">' . "\n";
+    return;
+  }
+  
+  // ページネーション2ページ目以降
+  if (is_paged() && get_query_var('paged') > 1) {
+    echo '<meta name="robots" content="noindex, follow">' . "\n";
+    return;
+  }
+  
+  // 絞り込み・並び替えURL（GETパラメータがある場合）
+  if (isset($_GET['site']) || isset($_GET['orderby']) || isset($_GET['filter'])) {
+    echo '<meta name="robots" content="noindex, follow">' . "\n";
+    return;
+  }
+}
+
 require_once get_template_directory() . '/inc/membership.php';
