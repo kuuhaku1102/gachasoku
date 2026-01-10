@@ -212,6 +212,71 @@ body {
   outline: none;
 }
 
+/* ドロップダウンメニュー */
+.site-header__menu .sub-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  min-width: 200px;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  list-style: none;
+  margin: 8px 0 0 0;
+  padding: 8px 0;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(-10px);
+  transition: all 0.3s ease;
+  z-index: 1000;
+}
+
+.site-header__menu li:hover > .sub-menu,
+.site-header__menu li:focus-within > .sub-menu {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+
+.site-header__menu .sub-menu li {
+  position: relative;
+}
+
+.site-header__menu .sub-menu a {
+  display: block;
+  padding: 10px 20px;
+  color: var(--dark-gray);
+  font-weight: 500;
+  white-space: nowrap;
+  border-left: 3px solid transparent;
+  transition: all 0.2s ease;
+}
+
+.site-header__menu .sub-menu a:hover,
+.site-header__menu .sub-menu a:focus {
+  background: rgba(255, 222, 89, 0.1);
+  border-left-color: var(--primary-color);
+  color: var(--dark-gray);
+  padding-left: 24px;
+}
+
+.site-header__menu .sub-menu li + li a {
+  border-top: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+/* ドロップダウンインジケーター */
+.site-header__menu .menu-item-has-children > a::after {
+  content: '▼';
+  font-size: 0.7em;
+  margin-left: 6px;
+  opacity: 0.6;
+  transition: transform 0.3s ease;
+}
+
+.site-header__menu .menu-item-has-children:hover > a::after {
+  transform: rotate(180deg);
+}
+
 .screen-reader-text {
   position: absolute;
   width: 1px;
@@ -431,6 +496,33 @@ main > :not(.single-post):not(.archive-section) {
 
   .site-header__menu li + li a {
     border-top: 1px solid rgba(0, 0, 0, 0.05);
+  }
+
+  /* モバイル版ドロップダウンメニュー */
+  .site-header__menu .sub-menu {
+    position: static;
+    opacity: 1;
+    visibility: visible;
+    transform: none;
+    box-shadow: none;
+    background: rgba(255, 222, 89, 0.05);
+    margin: 0;
+    padding: 0;
+    border-radius: 0;
+  }
+
+  .site-header__menu .sub-menu a {
+    padding-left: 40px;
+    font-size: 0.9em;
+  }
+
+  .site-header__menu .sub-menu a:hover,
+  .site-header__menu .sub-menu a:focus {
+    padding-left: 44px;
+  }
+
+  .site-header__menu .menu-item-has-children > a::after {
+    display: none;
   }
 
   main {
