@@ -29,9 +29,9 @@ jobs:
       - name: Generate and post article
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          WP_SITE_URL: ${{ secrets.WP_SITE_URL }}
+          WP_URL: ${{ secrets.WP_URL }}
           WP_USER: ${{ secrets.WP_USER }}
-          WP_APP_PASSWORD: ${{ secrets.WP_APP_PASSWORD }}
+          WP_PASS: ${{ secrets.WP_PASS }}
         run: |
           cd scripts
           python auto_blog.py
