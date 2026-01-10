@@ -74,21 +74,12 @@
     ?>
     <nav class="site-header__nav" id="primary-navigation" aria-label="メインメニュー">
       <ul class="site-header__menu">
-        <li class="menu-item"><a href="<?php echo esc_url(home_url('/')); ?>">ホーム</a></li>
-        <?php
-        // カテゴリーメニューを動的に生成
-        $categories = get_categories([
-          'orderby' => 'id',
-          'order'   => 'ASC',
-          'hide_empty' => false,
-        ]);
-        foreach ($categories as $category) :
-          $is_current = is_category($category->term_id);
-        ?>
-          <li class="menu-item<?php echo $is_current ? ' current-menu-item' : ''; ?>">
-            <a href="<?php echo esc_url(get_category_link($category->term_id)); ?>"><?php echo esc_html($category->name); ?></a>
-          </li>
-        <?php endforeach; ?>
+        <li class="menu-item<?php echo is_front_page() ? ' current-menu-item' : ''; ?>">
+          <a href="<?php echo esc_url(home_url('/')); ?>">ホーム</a>
+        </li>
+        <li class="menu-item<?php echo is_page('blog') || is_home() || is_singular('post') || is_category() || is_tag() || is_archive() ? ' current-menu-item' : ''; ?>">
+          <a href="<?php echo esc_url(home_url('/blog/')); ?>">記事一覧</a>
+        </li>
       </ul>
       <div class="site-header__membership site-header__membership--mobile">
         <?php foreach ($membership_links as $link) : ?>
