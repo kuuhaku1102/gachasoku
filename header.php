@@ -73,13 +73,23 @@
     }
     ?>
     <nav class="site-header__nav" id="primary-navigation" aria-label="メインメニュー">
-      <?php
-      wp_nav_menu([
-        'theme_location' => 'main-menu',
-        'menu_class'     => 'site-header__menu',
-        'container'      => false,
-      ]);
-      ?>
+      <ul class="site-header__menu">
+        <li class="menu-item"><a href="<?php echo esc_url(home_url('/')); ?>">ホーム</a></li>
+        <?php
+        // カテゴリーメニューを動的に生成
+        $categories = get_categories([
+          'orderby' => 'id',
+          'order'   => 'ASC',
+          'hide_empty' => false,
+        ]);
+        foreach ($categories as $category) :
+          $is_current = is_category($category->term_id);
+        ?>
+          <li class="menu-item<?php echo $is_current ? ' current-menu-item' : ''; ?>">
+            <a href="<?php echo esc_url(get_category_link($category->term_id)); ?>"><?php echo esc_html($category->name); ?></a>
+          </li>
+        <?php endforeach; ?>
+      </ul>
       <div class="site-header__membership site-header__membership--mobile">
         <?php foreach ($membership_links as $link) : ?>
           <a class="site-header__membership-link<?php echo !empty($link['is_logout']) ? ' site-header__membership-link--logout' : ''; ?>" href="<?php echo esc_url($link['url']); ?>"><?php echo esc_html($link['label']); ?></a>
