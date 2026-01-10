@@ -16,12 +16,13 @@ class WordPressPublisher:
     """WordPress投稿クラス"""
     
     def __init__(self):
-        self.site_url = os.environ.get("WP_SITE_URL")
+        # GitHub Secretsの実際の変数名に合わせる
+        self.site_url = os.environ.get("WP_URL") or os.environ.get("WP_SITE_URL")
         self.username = os.environ.get("WP_USER")
-        self.app_password = os.environ.get("WP_APP_PASSWORD")
+        self.app_password = os.environ.get("WP_PASS") or os.environ.get("WP_APP_PASSWORD")
         
         if not all([self.site_url, self.username, self.app_password]):
-            raise ValueError("環境変数が設定されていません: WP_SITE_URL, WP_USER, WP_APP_PASSWORD")
+            raise ValueError("環境変数が設定されていません: WP_URL, WP_USER, WP_PASS")
         
         # Basic認証ヘッダー
         credentials = f"{self.username}:{self.app_password}"
