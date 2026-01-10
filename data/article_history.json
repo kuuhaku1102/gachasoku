@@ -1,5 +1,10 @@
 {
-  "last_category": null,
-  "last_article_date": null,
-  "category_progress": {}
+  "last_category": "tips",
+  "last_article_date": "2026-01-10",
+  "category_progress": {
+    "tips": {
+      "total_articles": 1,
+      "last_priority": 1
+    }
+  }
 }
