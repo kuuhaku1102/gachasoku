@@ -16,8 +16,11 @@ class AutoBlogSystem:
     """自動ブログシステムクラス"""
     
     def __init__(self):
-        self.design_path = 'data/seo_category_design.json'
-        self.history_path = 'data/article_history.json'
+        # GitHub Actionsではscripts/から実行されるため、親ディレクトリを参照
+        import os
+        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        self.design_path = os.path.join(base_dir, 'data/seo_category_design.json')
+        self.history_path = os.path.join(base_dir, 'data/article_history.json')
         
         self.design = self._load_json(self.design_path)
         self.history = self._load_json(self.history_path)
@@ -125,10 +128,12 @@ class AutoBlogSystem:
     
     def _save_article(self, article):
         """生成された記事を保存"""
+        import os
+        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        filename = f"data/articles/article_{timestamp}.json"
+        filename = os.path.join(base_dir, f"data/articles/article_{timestamp}.json")
         
-        os.makedirs('data/articles', exist_ok=True)
+        os.makedirs(os.path.join(base_dir, 'data/articles'), exist_ok=True)
         
         with open(filename, 'w', encoding='utf-8') as f:
             json.dump(article, f, ensure_ascii=False, indent=2)

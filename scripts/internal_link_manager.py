@@ -13,7 +13,11 @@ from datetime import datetime
 class InternalLinkManager:
     """内部リンク管理クラス"""
     
-    def __init__(self, db_path='../data/internal_links_db.json'):
+    def __init__(self, db_path=None):
+        if db_path is None:
+            import os
+            base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+            db_path = os.path.join(base_dir, 'data/internal_links_db.json')
         self.db_path = db_path
         self.db = self._load_db()
     
