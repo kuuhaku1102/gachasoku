@@ -1,5 +1,5 @@
 {
-  "last_category": "pokemon",
+  "last_category": "guide",
   "last_article_date": "2026-01-10",
   "category_progress": {
     "tips": {
@@ -15,6 +15,10 @@
       "last_priority": 1
     },
     "pokemon": {
+      "total_articles": 1,
+      "last_priority": 1
+    },
+    "guide": {
       "total_articles": 1,
       "last_priority": 1
     }
