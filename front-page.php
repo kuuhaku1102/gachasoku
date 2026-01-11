@@ -75,13 +75,6 @@ get_header();
             $thumbnail_url = get_the_post_thumbnail_url(get_the_ID(), 'medium');
             ?>
             <article class="latest-posts__card">
-              <a class="latest-posts__thumb" href="<?php the_permalink(); ?>">
-                <?php if ($thumbnail_url) : ?>
-                  <img src="<?php echo esc_url($thumbnail_url); ?>" alt="<?php the_title_attribute(); ?>">
-                <?php else : ?>
-                  <span class="latest-posts__thumb--placeholder">No Image</span>
-                <?php endif; ?>
-              </a>
               <div class="latest-posts__body">
                 <time class="latest-posts__date" datetime="<?php echo esc_attr(get_the_date('c')); ?>"><?php echo esc_html(get_the_date()); ?></time>
                 <h3 class="latest-posts__title"><a href="<?php the_permalink(); ?>"><?php the_title(); ?></a></h3>
