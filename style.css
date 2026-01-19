@@ -4088,3 +4088,446 @@ main > :not(.single-post):not(.archive-section) {
     font-size: 0.95rem;
   }
 }
+
+
+/* ================================================
+   AIポケカ投資予想
+   ================================================ */
+
+/* ヒーローセクション */
+.ai-pokeca-hero {
+  background: linear-gradient(135deg, #ffde59 0%, #ffd633 100%);
+  padding: 60px 20px;
+  text-align: center;
+  border-bottom: 4px solid #f0c419;
+}
+
+.ai-pokeca-hero h1 {
+  font-size: 2.5rem;
+  color: #333;
+  margin-bottom: 15px;
+  font-weight: 700;
+}
+
+.ai-pokeca-hero p {
+  font-size: 1.1rem;
+  color: #555;
+  max-width: 700px;
+  margin: 0 auto;
+}
+
+/* 一覧ページ - グリッドレイアウト */
+.ai-pokeca-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 30px;
+  margin-bottom: 40px;
+}
+
+.ai-pokeca-card {
+  background: #fff;
+  border-radius: 12px;
+  padding: 25px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  border: 2px solid #f5f5f5;
+}
+
+.ai-pokeca-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
+  border-color: #ffde59;
+}
+
+.ai-pokeca-card__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+}
+
+.ai-pokeca-card__date {
+  font-size: 0.9rem;
+  color: #666;
+  font-weight: 500;
+}
+
+.ai-pokeca-card__badge {
+  background: #ffde59;
+  color: #333;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.ai-pokeca-card__title {
+  font-size: 1.4rem;
+  margin-bottom: 12px;
+  line-height: 1.4;
+}
+
+.ai-pokeca-card__title a {
+  color: #333;
+  text-decoration: none;
+  transition: color 0.3s ease;
+}
+
+.ai-pokeca-card__title a:hover {
+  color: #f0c419;
+}
+
+.ai-pokeca-card__excerpt {
+  font-size: 0.95rem;
+  color: #666;
+  line-height: 1.6;
+  margin-bottom: 15px;
+}
+
+.ai-pokeca-card__preview {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 15px;
+  overflow-x: auto;
+}
+
+.ai-pokeca-card__preview-item {
+  flex-shrink: 0;
+  width: 80px;
+  height: 112px;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 2px solid #f0f0f0;
+}
+
+.ai-pokeca-card__preview-item img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.ai-pokeca-card__link {
+  display: inline-block;
+  background: #ffde59;
+  color: #333;
+  padding: 10px 20px;
+  border-radius: 6px;
+  text-decoration: none;
+  font-weight: 600;
+  transition: background 0.3s ease;
+}
+
+.ai-pokeca-card__link:hover {
+  background: #ffd633;
+}
+
+.ai-pokeca-empty {
+  text-align: center;
+  padding: 60px 20px;
+  color: #999;
+  font-size: 1.1rem;
+}
+
+/* 詳細ページ */
+.ai-pokeca-detail {
+  padding: 40px 0;
+}
+
+.ai-pokeca-detail__header {
+  text-align: center;
+  margin-bottom: 50px;
+  padding: 40px 20px;
+  background: linear-gradient(135deg, #ffde59 0%, #ffd633 100%);
+  border-radius: 12px;
+}
+
+.ai-pokeca-detail__date {
+  display: inline-block;
+  font-size: 1rem;
+  color: #555;
+  margin-bottom: 15px;
+  font-weight: 500;
+}
+
+.ai-pokeca-detail__title {
+  font-size: 2.2rem;
+  color: #333;
+  margin-bottom: 15px;
+  font-weight: 700;
+}
+
+.ai-pokeca-detail__excerpt {
+  font-size: 1.1rem;
+  color: #555;
+  line-height: 1.8;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+/* カード一覧 */
+.ai-pokeca-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 30px;
+  margin-bottom: 50px;
+}
+
+.ai-pokeca-card-item {
+  background: #fff;
+  border-radius: 12px;
+  padding: 25px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  border: 2px solid #f5f5f5;
+  position: relative;
+}
+
+.ai-pokeca-card-item__number {
+  position: absolute;
+  top: 15px;
+  right: 15px;
+  background: #ffde59;
+  color: #333;
+  padding: 5px 12px;
+  border-radius: 20px;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.ai-pokeca-card-item__image {
+  width: 100%;
+  max-width: 250px;
+  margin: 0 auto 20px;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.ai-pokeca-card-item__image img {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.ai-pokeca-card-item__content {
+  text-align: center;
+}
+
+.ai-pokeca-card-item__name {
+  font-size: 1.4rem;
+  color: #333;
+  margin-bottom: 15px;
+  font-weight: 700;
+}
+
+.ai-pokeca-card-item__price {
+  background: #f9f9f9;
+  padding: 15px;
+  border-radius: 8px;
+  margin-bottom: 20px;
+}
+
+.ai-pokeca-card-item__price-label {
+  display: block;
+  font-size: 0.9rem;
+  color: #666;
+  margin-bottom: 5px;
+}
+
+.ai-pokeca-card-item__price-value {
+  display: block;
+  font-size: 1.8rem;
+  color: #e74c3c;
+  font-weight: 700;
+}
+
+.ai-pokeca-card-item__reason {
+  text-align: left;
+  background: #fffbf0;
+  padding: 20px;
+  border-radius: 8px;
+  border-left: 4px solid #ffde59;
+}
+
+.ai-pokeca-card-item__reason-title {
+  font-size: 1.1rem;
+  color: #333;
+  margin-bottom: 10px;
+  font-weight: 600;
+}
+
+.ai-pokeca-card-item__reason p {
+  font-size: 0.95rem;
+  color: #555;
+  line-height: 1.7;
+  margin: 0;
+}
+
+/* 総評 */
+.ai-pokeca-detail__content {
+  max-width: 800px;
+  margin: 50px auto;
+  padding: 30px;
+  background: #f9f9f9;
+  border-radius: 12px;
+  border-left: 4px solid #ffde59;
+}
+
+.ai-pokeca-detail__content h2 {
+  font-size: 1.6rem;
+  color: #333;
+  margin-bottom: 20px;
+}
+
+.ai-pokeca-detail__content p {
+  font-size: 1rem;
+  color: #555;
+  line-height: 1.8;
+}
+
+/* フッター */
+.ai-pokeca-detail__footer {
+  text-align: center;
+  margin-top: 50px;
+}
+
+.btn-back {
+  display: inline-block;
+  background: #fff;
+  color: #333;
+  padding: 12px 30px;
+  border-radius: 6px;
+  text-decoration: none;
+  font-weight: 600;
+  border: 2px solid #ffde59;
+  transition: all 0.3s ease;
+}
+
+.btn-back:hover {
+  background: #ffde59;
+  color: #333;
+}
+
+/* ナビゲーション */
+.ai-pokeca-navigation {
+  background: #f9f9f9;
+  padding: 40px 0;
+}
+
+.ai-pokeca-navigation__links {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 20px;
+}
+
+.ai-pokeca-navigation__link {
+  display: block;
+  background: #fff;
+  padding: 20px;
+  border-radius: 8px;
+  text-decoration: none;
+  border: 2px solid #f0f0f0;
+  transition: all 0.3s ease;
+}
+
+.ai-pokeca-navigation__link:hover {
+  border-color: #ffde59;
+  transform: translateY(-3px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.ai-pokeca-navigation__label {
+  display: block;
+  font-size: 0.85rem;
+  color: #999;
+  margin-bottom: 8px;
+}
+
+.ai-pokeca-navigation__title {
+  display: block;
+  font-size: 1.1rem;
+  color: #333;
+  font-weight: 600;
+  margin-bottom: 5px;
+}
+
+.ai-pokeca-navigation__date {
+  display: block;
+  font-size: 0.9rem;
+  color: #666;
+}
+
+/* About セクション */
+.ai-pokeca-about {
+  background: #f9f9f9;
+  padding: 60px 20px;
+}
+
+.ai-pokeca-about h2 {
+  font-size: 2rem;
+  color: #333;
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+.ai-pokeca-about__content {
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.ai-pokeca-about__content p {
+  font-size: 1rem;
+  color: #555;
+  line-height: 1.8;
+  margin-bottom: 20px;
+}
+
+.ai-pokeca-about__content ul {
+  list-style: none;
+  padding: 0;
+  margin-bottom: 20px;
+}
+
+.ai-pokeca-about__content ul li {
+  font-size: 1rem;
+  color: #555;
+  line-height: 1.8;
+  padding-left: 30px;
+  position: relative;
+  margin-bottom: 10px;
+}
+
+.ai-pokeca-about__note {
+  background: #fffbf0;
+  padding: 15px;
+  border-radius: 8px;
+  border-left: 4px solid #f0c419;
+  font-size: 0.9rem;
+  color: #666;
+}
+
+/* レスポンシブ対応 */
+@media (max-width: 768px) {
+  .ai-pokeca-hero h1 {
+    font-size: 1.8rem;
+  }
+
+  .ai-pokeca-hero p {
+    font-size: 1rem;
+  }
+
+  .ai-pokeca-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .ai-pokeca-detail__title {
+    font-size: 1.6rem;
+  }
+
+  .ai-pokeca-cards {
+    grid-template-columns: 1fr;
+  }
+
+  .ai-pokeca-navigation__links {
+    grid-template-columns: 1fr;
+  }
+}
