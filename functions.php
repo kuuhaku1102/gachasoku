@@ -2142,5 +2142,8 @@ function gachasoku_seo_noindex_rules() {
 
 require_once get_template_directory() . '/inc/membership.php';
 
+// オークション機能
+require_once get_template_directory() . '/inc/auction.php';
+
 // AIポケカ投資機能
 require_once get_template_directory() . '/ai-pokeca-investment.php';

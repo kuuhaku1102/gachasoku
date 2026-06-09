@@ -3458,6 +3458,13 @@ function gachasoku_member_dashboard_shortcode() {
       <h2 class="gachasoku-dashboard__title">当選結果</h2>
       <?php echo gachasoku_render_dashboard_campaign_list($grouped['result'], '当選結果はまだありません。', true); ?>
     </section>
+
+    <?php
+    // オークション落札結果（秘密のパスワード）セクション。auction.php 読み込み時のみ表示。
+    if (function_exists('gachasoku_render_member_auction_section')) {
+      echo gachasoku_render_member_auction_section($member);
+    }
+    ?>
   </div>
   <?php echo gachasoku_render_membership_links('dashboard'); ?>
   <?php
