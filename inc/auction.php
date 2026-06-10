@@ -1812,6 +1812,19 @@ function gachasoku_auction_front_styles() {
     .gachasoku-auction-won__warn{color:#b42318;font-size:13px;margin-top:8px;}
     .gachasoku-auction-won__done{color:#1a7f37;font-weight:bold;}
     .gachasoku-auction-won__state--confirmed{color:#1a7f37;font-weight:bold;}
+    /* 入札速報トースト */
+    .gachasoku-toast-container{position:fixed;right:16px;bottom:16px;z-index:9999;display:flex;flex-direction:column;gap:10px;max-width:320px;pointer-events:none;}
+    .gachasoku-toast{pointer-events:auto;display:flex;align-items:center;gap:10px;background:#1f2937;color:#fff;text-decoration:none;padding:12px 14px;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.25);opacity:0;transform:translateY(12px);transition:opacity .3s ease,transform .3s ease;border-left:4px solid #1a7f37;}
+    .gachasoku-toast.is-visible{opacity:1;transform:translateY(0);}
+    .gachasoku-toast:hover{color:#fff;opacity:.95;}
+    .gachasoku-toast__icon{font-size:22px;line-height:1;}
+    .gachasoku-toast__body{display:flex;flex-direction:column;}
+    .gachasoku-toast__title{font-size:14px;font-weight:bold;line-height:1.3;}
+    .gachasoku-toast__price{font-size:13px;color:#9ae6b4;margin-top:2px;}
+    @media (max-width:600px){
+      .gachasoku-toast-container{left:12px;right:12px;bottom:12px;max-width:none;}
+      .gachasoku-toast__title{font-size:13px;}
+    }
     /* レスポンシブ */
     @media (max-width:782px){
       .gachasoku-auction-list{grid-template-columns:repeat(2,1fr);gap:12px;}
@@ -1831,4 +1844,147 @@ function gachasoku_auction_front_styles() {
     }
     ';
     wp_add_inline_style('yellowsmile-style', $css);
+}
+
+/* =========================================================================
+ * 入札速報トースト（ポーリング型お知らせ）
+ *
+ * 入札があると、オークション関連ページを閲覧中の他ユーザーへ
+ * 「『商品名』に新しい入札がありました」をトースト表示する。
+ * 共用ホスティングでも軽いよう、結果は短時間 transient でキャッシュする。
+ * ====================================================================== */
+
+/**
+ * 直近の入札（開催中オークションのみ）を取得する。10秒間キャッシュ。
+ *
+ * @param int $minutes 遡る分数。
+ * @param int $limit   最大件数。
+ * @return array 各要素 ['id'=>int,'auction_id'=>int,'member_id'=>int,'title'=>string,'url'=>string,'price'=>int,'created_at'=>string]
+ */
+function gachasoku_get_recent_auction_bids($minutes = 10, $limit = 15) {
+    $cache_key = 'gachasoku_auction_recent_bids';
+    $cached = get_transient($cache_key);
+    if (is_array($cached)) {
+        return $cached;
+    }
+
+    global $wpdb;
+    $bids_table = gachasoku_get_auction_bids_table();
+
+    $since = date('Y-m-d H:i:s', current_time('timestamp') - (max(1, (int) $minutes) * MINUTE_IN_SECONDS));
+
+    $rows = $wpdb->get_results(
+        $wpdb->prepare(
+            "SELECT id, auction_id, member_id, amount, created_at
+             FROM {$bids_table}
+             WHERE created_at >= %s
+             ORDER BY id DESC
+             LIMIT %d",
+            $since,
+            max(1, (int) $limit)
+        ),
+        ARRAY_A
+    );
+
+    $list = [];
+    if ($rows) {
+        foreach ($rows as $row) {
+            $auction_id = (int) $row['auction_id'];
+            // 公開中かつ開催中のオークションのみ通知する。
+            if (get_post_status($auction_id) !== 'publish' || gachasoku_get_auction_status($auction_id) !== 'open') {
+                continue;
+            }
+            $list[] = [
+                'id' => (int) $row['id'],
+                'auction_id' => $auction_id,
+                'member_id' => (int) $row['member_id'],
+                'title' => get_the_title($auction_id),
+                'url' => get_permalink($auction_id),
+                'price' => (int) $row['amount'],
+                'created_at' => $row['created_at'],
+            ];
+        }
+    }
+
+    set_transient($cache_key, $list, 10);
+    return $list;
+}
+
+add_action('wp_ajax_gachasoku_auction_feed', 'gachasoku_ajax_auction_feed');
+add_action('wp_ajax_nopriv_gachasoku_auction_feed', 'gachasoku_ajax_auction_feed');
+/**
+ * 入札速報フィードのAJAXエンドポイント。
+ *
+ * 公開情報（商品名・現在価格）のみ返す。閲覧中のオークションと
+ * リクエスト元会員自身の入札は除外する。
+ *
+ * @return void
+ */
+function gachasoku_ajax_auction_feed() {
+    $after = isset($_GET['after']) ? (int) $_GET['after'] : 0;
+    $current = isset($_GET['current']) ? (int) $_GET['current'] : 0;
+    $member_id = gachasoku_get_current_member_id();
+
+    $all = gachasoku_get_recent_auction_bids();
+
+    $last_id = 0;
+    foreach ($all as $bid) {
+        if ($bid['id'] > $last_id) {
+            $last_id = $bid['id'];
+        }
+    }
+
+    $items = [];
+    // 初回（after<=0）はベースライン取得のみ。通知は次回ポーリングから。
+    if ($after > 0) {
+        foreach ($all as $bid) {
+            if ($bid['id'] <= $after) {
+                continue;
+            }
+            if ($current && $bid['auction_id'] === $current) {
+                continue; // 閲覧中のオークションは出さない
+            }
+            if ($member_id && $bid['member_id'] === $member_id) {
+                continue; // 自分の入札は出さない
+            }
+            $items[] = [
+                'id' => $bid['id'],
+                'title' => $bid['title'],
+                'url' => $bid['url'],
+                'price' => number_format($bid['price']),
+            ];
+        }
+    }
+
+    wp_send_json_success([
+        'last_id' => $last_id,
+        'items' => $items,
+    ]);
+}
+
+add_action('wp_enqueue_scripts', 'gachasoku_auction_feed_assets', 21);
+/**
+ * オークション関連ページで入札速報スクリプトを読み込む。
+ *
+ * @return void
+ */
+function gachasoku_auction_feed_assets() {
+    // オークション一覧・詳細ページでのみ動作させ、無駄な問い合わせを避ける。
+    if (!is_singular(GACHASOKU_AUCTION_POST_TYPE) && !is_post_type_archive(GACHASOKU_AUCTION_POST_TYPE)) {
+        return;
+    }
+
+    wp_enqueue_script(
+        'gachasoku-auction-feed',
+        get_template_directory_uri() . '/js/auction.js',
+        [],
+        wp_get_theme()->get('Version'),
+        true
+    );
+
+    wp_localize_script('gachasoku-auction-feed', 'GachasokuAuctionFeed', [
+        'ajaxUrl' => admin_url('admin-ajax.php'),
+        'currentAuction' => is_singular(GACHASOKU_AUCTION_POST_TYPE) ? get_the_ID() : 0,
+        'interval' => 25000,
+    ]);
 }
