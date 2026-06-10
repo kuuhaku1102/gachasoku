@@ -23,6 +23,17 @@ get_header();
     </div>
   </section>
 
+  <section id="auctions" class="auctions section">
+    <div class="container">
+      <h2>開催中オークション</h2>
+      <p>今まさに入札を受付中のオークションをピックアップ！気になる商品は早めにチェックしよう。</p>
+      <?php echo do_shortcode('[gachasoku_auctions status="open" limit="8"]'); ?>
+      <p class="auctions__more">
+        <a class="btn-primary" href="<?php echo esc_url(get_post_type_archive_link('gachasoku_auction') ?: home_url('/auction/')); ?>">オークション一覧を見る →</a>
+      </p>
+    </div>
+  </section>
+
   <section id="campaigns" class="campaigns section">
     <div class="container">
       <h2>現在開催中のキャンペーン</h2>
