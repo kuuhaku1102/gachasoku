@@ -21,4 +21,12 @@ get_header(); ?>
   <?php echo do_shortcode('[gachasoku_auctions]'); ?>
 </section>
 
+<section id="ranking" class="ranking-highlight section archive-section--auction-ranking">
+  <div class="container">
+    <h2>人気ランキングガチャ</h2>
+    <p>人気と評価の高いオンラインオリパをランキング形式でチェック！迷ったときの参考にどうぞ。</p>
+    <?php echo do_shortcode('[gachasoku_ranking]'); ?>
+  </div>
+</section>
+
 <?php get_footer(); ?>

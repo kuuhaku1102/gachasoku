@@ -1364,7 +1364,8 @@ add_shortcode('gachasoku_auctions', 'gachasoku_auctions_shortcode');
  * @return string
  */
 function gachasoku_auctions_shortcode($atts = []) {
-    $atts = shortcode_atts(['status' => ''], $atts, 'gachasoku_auctions');
+    $atts = shortcode_atts(['status' => '', 'limit' => 0], $atts, 'gachasoku_auctions');
+    $limit = max(0, (int) $atts['limit']);
 
     $query = new WP_Query([
         'post_type' => GACHASOKU_AUCTION_POST_TYPE,
@@ -1418,6 +1419,10 @@ function gachasoku_auctions_shortcode($atts = []) {
         }
         return $a['end_ts'] - $b['end_ts']; // それ以外は昇順（終了が近い順）
     });
+
+    if ($limit > 0) {
+        $items = array_slice($items, 0, $limit);
+    }
 
     $status_labels = ['scheduled' => '開催前', 'open' => '開催中', 'ended' => '終了'];
 
@@ -1801,6 +1806,7 @@ function gachasoku_auction_front_styles() {
     .gachasoku-auction__condition--damage_small{background:#fff7e0;color:#8a6d00;border-color:#f3e3a0;}
     .gachasoku-auction__condition--damage_large{background:#fdeaea;color:#b42318;border-color:#f3c0c0;}
     .gachasoku-auction-card__condition{position:absolute;top:8px;right:8px;padding:2px 10px;border-radius:999px;font-size:12px;font-weight:bold;z-index:1;background:#eef2ff;color:#3a4ba0;}
+    .auctions__more{text-align:center;margin-top:20px;}
     .gachasoku-auction__image img{max-width:100%;height:auto;border-radius:10px;}
     .gachasoku-auction__info{display:flex;flex-wrap:wrap;gap:16px;margin:16px 0;padding:0;}
     .gachasoku-auction__info>div{background:#faf9f6;border:1px solid #eee;border-radius:8px;padding:10px 16px;min-width:120px;}
