@@ -1369,56 +1369,91 @@ function gachasoku_auctions_shortcode($atts = []) {
     $query = new WP_Query([
         'post_type' => GACHASOKU_AUCTION_POST_TYPE,
         'post_status' => 'publish',
-        'posts_per_page' => 30,
+        'posts_per_page' => 60,
         'no_found_rows' => true,
-        'meta_key' => '_gachasoku_auction_end',
-        'orderby' => 'meta_value',
-        'order' => 'ASC',
+        'fields' => 'ids',
+        'orderby' => 'date',
+        'order' => 'DESC',
     ]);
 
-    if (!$query->have_posts()) {
+    if (empty($query->posts)) {
         return '<p class="gachasoku-auction__notice">現在出品中のオークションはありません。</p>';
     }
 
     $filter = sanitize_key($atts['status']);
 
-    ob_start();
-    echo '<div class="gachasoku-auction-list">';
-    while ($query->have_posts()) {
-        $query->the_post();
-        $auction_id = get_the_ID();
+    // 状態の優先度: 開催中(0) → 開催前(1) → 終了(2)。
+    $priority = ['open' => 0, 'scheduled' => 1, 'ended' => 2];
+
+    $items = [];
+    foreach ($query->posts as $auction_id) {
+        $auction_id = (int) $auction_id;
         $status = gachasoku_get_auction_status($auction_id);
         if ($filter && $filter !== $status) {
             continue;
         }
         $fields = gachasoku_get_auction_fields($auction_id);
+        $end_ts = $fields['end_datetime'] ? strtotime($fields['end_datetime']) : 0;
+        $items[] = [
+            'id' => $auction_id,
+            'status' => $status,
+            'fields' => $fields,
+            'end_ts' => $end_ts,
+        ];
+    }
+
+    if (empty($items)) {
+        return '<p class="gachasoku-auction__notice">現在出品中のオークションはありません。</p>';
+    }
+
+    // 開催中・開催前は終了が近い順、終了済みは新しく終わった順。
+    usort($items, function ($a, $b) use ($priority) {
+        $pa = isset($priority[$a['status']]) ? $priority[$a['status']] : 99;
+        $pb = isset($priority[$b['status']]) ? $priority[$b['status']] : 99;
+        if ($pa !== $pb) {
+            return $pa - $pb;
+        }
+        if ($a['status'] === 'ended') {
+            return $b['end_ts'] - $a['end_ts']; // 終了は降順（最近終わった順）
+        }
+        return $a['end_ts'] - $b['end_ts']; // それ以外は昇順（終了が近い順）
+    });
+
+    $status_labels = ['scheduled' => '開催前', 'open' => '開催中', 'ended' => '終了'];
+
+    ob_start();
+    echo '<div class="gachasoku-auction-list">';
+    foreach ($items as $item) {
+        $auction_id = $item['id'];
+        $status = $item['status'];
+        $fields = $item['fields'];
         $price = gachasoku_get_auction_current_price($auction_id);
-        $status_labels = ['scheduled' => '開催前', 'open' => '開催中', 'ended' => '終了'];
+        $permalink = get_permalink($auction_id);
+        $title = get_the_title($auction_id);
         // 出品画像 → 無ければアイキャッチ → それも無ければプレースホルダー。
         $img = $fields['image_id'] ? wp_get_attachment_image_src($fields['image_id'], 'medium') : null;
         if (!$img && has_post_thumbnail($auction_id)) {
             $img = wp_get_attachment_image_src(get_post_thumbnail_id($auction_id), 'medium');
         }
+        $condition_label = gachasoku_get_auction_condition_label($fields['condition']);
         ?>
-        <?php $condition_label = gachasoku_get_auction_condition_label($fields['condition']); ?>
-        <a class="gachasoku-auction-card gachasoku-auction-card--<?php echo esc_attr($status); ?>" href="<?php the_permalink(); ?>">
+        <a class="gachasoku-auction-card gachasoku-auction-card--<?php echo esc_attr($status); ?>" href="<?php echo esc_url($permalink); ?>">
             <span class="gachasoku-auction-card__badge"><?php echo esc_html($status_labels[$status]); ?></span>
             <?php if ($condition_label !== '') : ?>
                 <span class="gachasoku-auction-card__condition gachasoku-auction__condition--<?php echo esc_attr($fields['condition']); ?>"><?php echo esc_html($condition_label); ?></span>
             <?php endif; ?>
             <?php if ($img) : ?>
-                <span class="gachasoku-auction-card__image"><img src="<?php echo esc_url($img[0]); ?>" alt="<?php echo esc_attr(get_the_title()); ?>" loading="lazy" /></span>
+                <span class="gachasoku-auction-card__image"><img src="<?php echo esc_url($img[0]); ?>" alt="<?php echo esc_attr($title); ?>" loading="lazy" /></span>
             <?php else : ?>
                 <span class="gachasoku-auction-card__image gachasoku-auction-card__image--placeholder">🔨</span>
             <?php endif; ?>
-            <span class="gachasoku-auction-card__title"><?php echo esc_html(get_the_title()); ?></span>
+            <span class="gachasoku-auction-card__title"><?php echo esc_html($title); ?></span>
             <span class="gachasoku-auction-card__price">現在価格 <?php echo esc_html(number_format($price)); ?> 円</span>
             <?php if ($fields['end_datetime']) : ?><span class="gachasoku-auction-card__end">終了 <?php echo esc_html(gachasoku_format_datetime($fields['end_datetime'])); ?></span><?php endif; ?>
         </a>
         <?php
     }
     echo '</div>';
-    wp_reset_postdata();
 
     return ob_get_clean();
 }
