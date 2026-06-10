@@ -248,8 +248,36 @@ function gachasoku_get_auction_fields($auction_id) {
         'x_account' => (string) get_post_meta($auction_id, '_gachasoku_auction_x_account', true),
         'auto_extend_enabled' => (bool) get_post_meta($auction_id, '_gachasoku_auction_auto_extend_enabled', true),
         'auto_extend_minutes' => $auto_extend_minutes,
+        'condition' => (string) get_post_meta($auction_id, '_gachasoku_auction_condition', true),
         'description' => (string) get_post_meta($auction_id, '_gachasoku_auction_description', true),
     ];
+}
+
+/**
+ * オークションの種類（コンディション）の選択肢を返す。
+ *
+ * @return array key => ラベル
+ */
+function gachasoku_get_auction_condition_options() {
+    return [
+        'box' => 'BOX',
+        'psa10' => 'PSA10',
+        'mint' => '美品',
+        'minor_scratch' => 'キズ多少あり',
+        'damage_large' => 'ダメージ大',
+        'damage_small' => 'ダメージ小',
+    ];
+}
+
+/**
+ * 種類キーから表示ラベルを返す（未設定・不正値は空文字）。
+ *
+ * @param string $key コンディションキー。
+ * @return string
+ */
+function gachasoku_get_auction_condition_label($key) {
+    $options = gachasoku_get_auction_condition_options();
+    return isset($options[$key]) ? $options[$key] : '';
 }
 
 /**
@@ -322,6 +350,18 @@ function gachasoku_render_auction_meta_box($post) {
             <td>
                 <input type="datetime-local" name="gachasoku_auction_end" id="gachasoku_auction_end" value="<?php echo esc_attr($end); ?>" />
                 <p class="description">この日時を過ぎると自動的に締め切られ、最高額入札者が落札者になります。</p>
+            </td>
+        </tr>
+        <tr>
+            <th scope="row"><label for="gachasoku_auction_condition">種類（コンディション）</label></th>
+            <td>
+                <select name="gachasoku_auction_condition" id="gachasoku_auction_condition">
+                    <option value="">未設定</option>
+                    <?php foreach (gachasoku_get_auction_condition_options() as $cond_key => $cond_label) : ?>
+                        <option value="<?php echo esc_attr($cond_key); ?>" <?php selected($fields['condition'], $cond_key); ?>><?php echo esc_html($cond_label); ?></option>
+                    <?php endforeach; ?>
+                </select>
+                <p class="description">商品の状態を選択すると、一覧・詳細ページにバッジ表示されます。</p>
             </td>
         </tr>
         <tr>
@@ -460,6 +500,11 @@ function gachasoku_save_auction_meta($post_id) {
     $auto_extend_enabled = isset($_POST['gachasoku_auction_auto_extend_enabled']) ? '1' : '';
     $auto_extend_minutes = isset($_POST['gachasoku_auction_auto_extend_minutes']) ? intval($_POST['gachasoku_auction_auto_extend_minutes']) : 5;
 
+    $condition = isset($_POST['gachasoku_auction_condition']) ? sanitize_key($_POST['gachasoku_auction_condition']) : '';
+    if (!array_key_exists($condition, gachasoku_get_auction_condition_options())) {
+        $condition = '';
+    }
+
     if ($bid_increment < 1) {
         $bid_increment = 1;
     }
@@ -487,6 +532,12 @@ function gachasoku_save_auction_meta($post_id) {
         update_post_meta($post_id, '_gachasoku_auction_auto_extend_enabled', '1');
     } else {
         delete_post_meta($post_id, '_gachasoku_auction_auto_extend_enabled');
+    }
+
+    if ($condition !== '') {
+        update_post_meta($post_id, '_gachasoku_auction_condition', $condition);
+    } else {
+        delete_post_meta($post_id, '_gachasoku_auction_condition');
     }
 }
 
@@ -1173,8 +1224,14 @@ function gachasoku_render_auction_detail($auction_id) {
             </div>
         <?php endif; ?>
 
-        <div class="gachasoku-auction__status gachasoku-auction__status--<?php echo esc_attr($status); ?>">
-            <?php echo esc_html($status_labels[$status]); ?>
+        <div class="gachasoku-auction__badges">
+            <span class="gachasoku-auction__status gachasoku-auction__status--<?php echo esc_attr($status); ?>">
+                <?php echo esc_html($status_labels[$status]); ?>
+            </span>
+            <?php $condition_label = gachasoku_get_auction_condition_label($fields['condition']); ?>
+            <?php if ($condition_label !== '') : ?>
+                <span class="gachasoku-auction__condition gachasoku-auction__condition--<?php echo esc_attr($fields['condition']); ?>"><?php echo esc_html($condition_label); ?></span>
+            <?php endif; ?>
         </div>
 
         <?php if ($fields['image_id']) :
@@ -1343,8 +1400,12 @@ function gachasoku_auctions_shortcode($atts = []) {
             $img = wp_get_attachment_image_src(get_post_thumbnail_id($auction_id), 'medium');
         }
         ?>
+        <?php $condition_label = gachasoku_get_auction_condition_label($fields['condition']); ?>
         <a class="gachasoku-auction-card gachasoku-auction-card--<?php echo esc_attr($status); ?>" href="<?php the_permalink(); ?>">
             <span class="gachasoku-auction-card__badge"><?php echo esc_html($status_labels[$status]); ?></span>
+            <?php if ($condition_label !== '') : ?>
+                <span class="gachasoku-auction-card__condition gachasoku-auction__condition--<?php echo esc_attr($fields['condition']); ?>"><?php echo esc_html($condition_label); ?></span>
+            <?php endif; ?>
             <?php if ($img) : ?>
                 <span class="gachasoku-auction-card__image"><img src="<?php echo esc_url($img[0]); ?>" alt="<?php echo esc_attr(get_the_title()); ?>" loading="lazy" /></span>
             <?php else : ?>
@@ -1694,6 +1755,17 @@ function gachasoku_auction_front_styles() {
     .gachasoku-auction__status--open{background:#1a7f37;color:#fff;}
     .gachasoku-auction__status--scheduled{background:#946200;color:#fff;}
     .gachasoku-auction__status--ended{background:#666;color:#fff;}
+    .gachasoku-auction__badges{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px;}
+    .gachasoku-auction__badges .gachasoku-auction__status{margin-bottom:0;}
+    /* 種類（コンディション）バッジ */
+    .gachasoku-auction__condition{display:inline-block;padding:4px 14px;border-radius:999px;font-weight:bold;font-size:14px;background:#eef2ff;color:#3a4ba0;border:1px solid #c7d2fe;}
+    .gachasoku-auction__condition--box{background:#fff4e5;color:#9a5b00;border-color:#ffd9a8;}
+    .gachasoku-auction__condition--psa10{background:#fde8ef;color:#a01a52;border-color:#f9b8d0;}
+    .gachasoku-auction__condition--mint{background:#e6f7ec;color:#1a7f37;border-color:#b7e4c7;}
+    .gachasoku-auction__condition--minor_scratch{background:#eef2ff;color:#3a4ba0;border-color:#c7d2fe;}
+    .gachasoku-auction__condition--damage_small{background:#fff7e0;color:#8a6d00;border-color:#f3e3a0;}
+    .gachasoku-auction__condition--damage_large{background:#fdeaea;color:#b42318;border-color:#f3c0c0;}
+    .gachasoku-auction-card__condition{position:absolute;top:8px;right:8px;padding:2px 10px;border-radius:999px;font-size:12px;font-weight:bold;z-index:1;background:#eef2ff;color:#3a4ba0;}
     .gachasoku-auction__image img{max-width:100%;height:auto;border-radius:10px;}
     .gachasoku-auction__info{display:flex;flex-wrap:wrap;gap:16px;margin:16px 0;padding:0;}
     .gachasoku-auction__info>div{background:#faf9f6;border:1px solid #eee;border-radius:8px;padding:10px 16px;min-width:120px;}
