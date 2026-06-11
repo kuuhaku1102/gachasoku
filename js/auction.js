@@ -93,6 +93,30 @@
       });
   }
 
+  // 自動入札トグル: ONで提携ページを別タブで開き、上限額の入力欄を表示する。
+  (function initAutobidToggle() {
+    var toggle = document.querySelector('.gachasoku-autobid-toggle');
+    if (!toggle) {
+      return;
+    }
+    var wrap = toggle.closest('.gachasoku-autobid');
+    var fields = wrap ? wrap.querySelector('.gachasoku-autobid__fields') : null;
+
+    toggle.addEventListener('change', function () {
+      if (toggle.checked) {
+        if (fields) {
+          fields.hidden = false;
+        }
+        var affiliate = wrap ? wrap.getAttribute('data-affiliate') : '';
+        if (affiliate) {
+          window.open(affiliate, '_blank', 'noopener');
+        }
+      } else if (fields) {
+        fields.hidden = true;
+      }
+    });
+  })();
+
   // 初回はベースライン取得（通知しない）。
   poll(true);
 
