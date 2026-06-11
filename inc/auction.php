@@ -595,6 +595,11 @@ function gachasoku_save_auction_meta($post_id) {
  * @return string 'scheduled'（開始前） | 'open'（開催中） | 'ended'（終了）
  */
 function gachasoku_get_auction_status($auction_id) {
+    // 即決落札や締切処理で確定済みなら、終了日時に関わらず「終了」。
+    if (get_post_meta($auction_id, '_gachasoku_auction_closed', true)) {
+        return 'ended';
+    }
+
     $fields = gachasoku_get_auction_fields($auction_id);
     $now = current_time('timestamp');
 
