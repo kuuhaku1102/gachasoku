@@ -28,7 +28,7 @@ if (!defined('ABSPATH')) {
 
 if (!defined('GACHASOKU_AUCTION_DB_VERSION')) {
     // テーブル定義を変更した場合のみインクリメントする。
-    define('GACHASOKU_AUCTION_DB_VERSION', '1.0.0');
+    define('GACHASOKU_AUCTION_DB_VERSION', '1.1.0');
 }
 
 if (!defined('GACHASOKU_AUCTION_POST_TYPE')) {
@@ -57,6 +57,16 @@ function gachasoku_get_auction_bids_table() {
 function gachasoku_get_auction_winners_table() {
     global $wpdb;
     return $wpdb->prefix . 'gachasoku_auction_winners';
+}
+
+/**
+ * 自動入札（プロキシ入札）の設定テーブル名を返す。
+ *
+ * @return string
+ */
+function gachasoku_get_auction_autobids_table() {
+    global $wpdb;
+    return $wpdb->prefix . 'gachasoku_auction_autobids';
 }
 
 /* -------------------------------------------------------------------------
@@ -104,11 +114,13 @@ function gachasoku_auction_tables_exist($force_refresh = false) {
 
     $bids_table = gachasoku_get_auction_bids_table();
     $winners_table = gachasoku_get_auction_winners_table();
+    $autobids_table = gachasoku_get_auction_autobids_table();
 
     $found_bids = $wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $bids_table));
     $found_winners = $wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $winners_table));
+    $found_autobids = $wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $autobids_table));
 
-    $exists = ($found_bids === $bids_table) && ($found_winners === $winners_table);
+    $exists = ($found_bids === $bids_table) && ($found_winners === $winners_table) && ($found_autobids === $autobids_table);
 
     return $exists;
 }
@@ -163,8 +175,24 @@ function gachasoku_install_auction_tables() {
         KEY member_id (member_id)
     ) {$charset_collate};";
 
+    // 自動入札（プロキシ入札）。max_amount は本人以外に絶対に公開しない秘密の上限額。
+    $autobids_table = gachasoku_get_auction_autobids_table();
+    $autobids_sql = "CREATE TABLE {$autobids_table} (
+        id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+        auction_id bigint(20) unsigned NOT NULL,
+        member_id bigint(20) unsigned NOT NULL,
+        max_amount bigint(20) unsigned NOT NULL,
+        enabled tinyint(1) NOT NULL DEFAULT 1,
+        created_at datetime NOT NULL,
+        updated_at datetime NOT NULL,
+        PRIMARY KEY  (id),
+        UNIQUE KEY auction_member (auction_id, member_id),
+        KEY auction_id (auction_id)
+    ) {$charset_collate};";
+
     dbDelta($bids_sql);
     dbDelta($winners_sql);
+    dbDelta($autobids_sql);
 
     update_option('gachasoku_auction_db_version', GACHASOKU_AUCTION_DB_VERSION);
 
@@ -248,6 +276,7 @@ function gachasoku_get_auction_fields($auction_id) {
         'x_account' => (string) get_post_meta($auction_id, '_gachasoku_auction_x_account', true),
         'auto_extend_enabled' => (bool) get_post_meta($auction_id, '_gachasoku_auction_auto_extend_enabled', true),
         'auto_extend_minutes' => $auto_extend_minutes,
+        'affiliate_link' => (string) get_post_meta($auction_id, '_gachasoku_auction_affiliate_link', true),
         'condition' => (string) get_post_meta($auction_id, '_gachasoku_auction_condition', true),
         'description' => (string) get_post_meta($auction_id, '_gachasoku_auction_description', true),
     ];
@@ -404,6 +433,13 @@ function gachasoku_render_auction_meta_box($post) {
             </td>
         </tr>
         <tr>
+            <th scope="row"><label for="gachasoku_auction_affiliate_link">自動入札ON時に開くアフィリエイトリンク</label></th>
+            <td>
+                <input type="url" name="gachasoku_auction_affiliate_link" id="gachasoku_auction_affiliate_link" class="regular-text" value="<?php echo esc_attr($fields['affiliate_link']); ?>" placeholder="https://" />
+                <p class="description">会員が自動入札をONにした際、このリンクが別タブで開きます。空欄なら何も開きません。</p>
+            </td>
+        </tr>
+        <tr>
             <th scope="row">商品画像</th>
             <td>
                 <div class="gachasoku-auction-image">
@@ -497,6 +533,7 @@ function gachasoku_save_auction_meta($post_id) {
     $buy_now_price = isset($_POST['gachasoku_auction_buy_now_price']) ? max(0, intval($_POST['gachasoku_auction_buy_now_price'])) : 0;
     $image_id = isset($_POST['gachasoku_auction_image_id']) ? intval($_POST['gachasoku_auction_image_id']) : 0;
     $x_account = isset($_POST['gachasoku_auction_x_account']) ? gachasoku_sanitize_x_account(wp_unslash($_POST['gachasoku_auction_x_account'])) : '';
+    $affiliate_link = isset($_POST['gachasoku_auction_affiliate_link']) ? esc_url_raw(wp_unslash($_POST['gachasoku_auction_affiliate_link'])) : '';
     $auto_extend_enabled = isset($_POST['gachasoku_auction_auto_extend_enabled']) ? '1' : '';
     $auto_extend_minutes = isset($_POST['gachasoku_auction_auto_extend_minutes']) ? intval($_POST['gachasoku_auction_auto_extend_minutes']) : 5;
 
@@ -526,6 +563,12 @@ function gachasoku_save_auction_meta($post_id) {
         update_post_meta($post_id, '_gachasoku_auction_x_account', $x_account);
     } else {
         delete_post_meta($post_id, '_gachasoku_auction_x_account');
+    }
+
+    if ($affiliate_link !== '') {
+        update_post_meta($post_id, '_gachasoku_auction_affiliate_link', $affiliate_link);
+    } else {
+        delete_post_meta($post_id, '_gachasoku_auction_affiliate_link');
     }
 
     if ($auto_extend_enabled) {
@@ -722,6 +765,10 @@ function gachasoku_handle_auction_bid() {
         gachasoku_auction_redirect_with_flash($auction_id, 'success', '即決価格で落札しました！マイページで秘密のパスワードをご確認ください。');
     }
 
+    if (empty($result['is_leader'])) {
+        gachasoku_auction_redirect_with_flash($auction_id, 'error', '入札しましたが、他のユーザーの自動入札により上回られました。より高い金額で再度お試しください。');
+    }
+
     gachasoku_auction_redirect_with_flash($auction_id, 'success', '入札を受け付けました。現在の最高額入札者です。');
 }
 
@@ -814,12 +861,17 @@ function gachasoku_place_auction_bid($auction_id, $member_id, $amount, $is_buy_n
         if ($won_buy_now) {
             // 即決成立。ロック内で落札確定まで行う。
             gachasoku_close_auction($auction_id, true);
-            return ['amount' => $amount, 'won_buy_now' => true];
+            return ['amount' => $amount, 'won_buy_now' => true, 'is_leader' => true];
         }
+
+        // 自動入札（プロキシ）を解決し、上限額の高い会員が先頭を維持するよう調整する。
+        gachasoku_resolve_auto_bids($auction_id, (int) $fields['bid_increment'], (int) $fields['start_price']);
 
         // スナイピング対策（自動延長）。
         if ($fields['auto_extend_enabled'] && $fields['end_datetime']) {
-            $end_ts = strtotime($fields['end_datetime']);
+            // 自動入札解決で終了時刻が変わる可能性はないが、最新メタを取り直す。
+            $end_meta = (string) get_post_meta($auction_id, '_gachasoku_auction_end', true);
+            $end_ts = $end_meta ? strtotime($end_meta) : 0;
             $now_ts = current_time('timestamp');
             $window = (int) $fields['auto_extend_minutes'] * MINUTE_IN_SECONDS;
             if ($end_ts && ($end_ts - $now_ts) <= $window) {
@@ -828,7 +880,11 @@ function gachasoku_place_auction_bid($auction_id, $member_id, $amount, $is_buy_n
             }
         }
 
-        return ['amount' => $amount, 'won_buy_now' => false];
+        // 解決後の先頭が自分かどうか（他者の自動入札に即時上回られた場合を判定）。
+        $final_highest = gachasoku_get_auction_highest_bid($auction_id);
+        $is_leader = ($final_highest && (int) $final_highest['member_id'] === (int) $member_id);
+
+        return ['amount' => $amount, 'won_buy_now' => false, 'is_leader' => $is_leader];
     } finally {
         $wpdb->query($wpdb->prepare('SELECT RELEASE_LOCK(%s)', $lock_name));
     }
@@ -894,6 +950,280 @@ function gachasoku_auction_client_ip() {
 function gachasoku_auction_user_agent() {
     $ua = isset($_SERVER['HTTP_USER_AGENT']) ? sanitize_text_field(wp_unslash($_SERVER['HTTP_USER_AGENT'])) : '';
     return substr($ua, 0, 191);
+}
+
+/* =========================================================================
+ * 自動入札（プロキシ入札）
+ *
+ * 会員が設定した「上限額」までシステムが自動で競り上げる。
+ * 上限額は本人以外に絶対に公開しない（公開されるのは実際に入札された金額のみ）。
+ * ====================================================================== */
+
+/**
+ * 指定会員の自動入札設定を取得する（本人確認は呼び出し側の責任）。
+ *
+ * @param int $auction_id 投稿ID。
+ * @param int $member_id  会員ID。
+ * @return array|null ['max_amount'=>int,'enabled'=>int,...]
+ */
+function gachasoku_get_member_autobid($auction_id, $member_id) {
+    global $wpdb;
+    $table = gachasoku_get_auction_autobids_table();
+    $row = $wpdb->get_row(
+        $wpdb->prepare(
+            "SELECT * FROM {$table} WHERE auction_id = %d AND member_id = %d",
+            (int) $auction_id,
+            (int) $member_id
+        ),
+        ARRAY_A
+    );
+    return $row ?: null;
+}
+
+/**
+ * 会員の自動入札を無効化する。
+ *
+ * @param int $auction_id 投稿ID。
+ * @param int $member_id  会員ID。
+ * @return void
+ */
+function gachasoku_disable_member_autobid($auction_id, $member_id) {
+    global $wpdb;
+    $table = gachasoku_get_auction_autobids_table();
+    $wpdb->update(
+        $table,
+        ['enabled' => 0, 'updated_at' => current_time('mysql')],
+        ['auction_id' => (int) $auction_id, 'member_id' => (int) $member_id],
+        ['%d', '%s'],
+        ['%d', '%d']
+    );
+}
+
+/**
+ * 自動入札（プロキシ）を解決し、上限額が最も高い会員が先頭を維持するよう
+ * 必要最小限の金額で入札を置き直す。GET_LOCK を保持した状態で呼ぶこと。
+ *
+ * 価格は「2番目に高い天井 + 入札単位」（最高天井で上限）に設定される（eBay式）。
+ *
+ * @param int $auction_id  投稿ID。
+ * @param int $increment   入札単位。
+ * @param int $start_price 開始価格。
+ * @return void
+ */
+function gachasoku_resolve_auto_bids($auction_id, $increment, $start_price) {
+    global $wpdb;
+
+    $auction_id = (int) $auction_id;
+    $increment = max(1, (int) $increment);
+    $start_price = max(0, (int) $start_price);
+
+    $bids_table = gachasoku_get_auction_bids_table();
+    $autobids_table = gachasoku_get_auction_autobids_table();
+
+    $autobids = $wpdb->get_results(
+        $wpdb->prepare(
+            "SELECT member_id, max_amount, created_at FROM {$autobids_table} WHERE auction_id = %d AND enabled = 1",
+            $auction_id
+        ),
+        ARRAY_A
+    );
+
+    $highest = gachasoku_get_auction_highest_bid($auction_id);
+
+    // 会員ごとの「天井（最大入札可能額）」を集約する。
+    $ceilings = [];
+    foreach ($autobids as $ab) {
+        $mid = (int) $ab['member_id'];
+        $ceilings[$mid] = [
+            'ceil' => (int) $ab['max_amount'],
+            'ts' => $ab['created_at'] ? strtotime($ab['created_at']) : PHP_INT_MAX,
+        ];
+    }
+    if ($highest) {
+        $mid = (int) $highest['member_id'];
+        $amt = (int) $highest['amount'];
+        // 自動上限より高い手動入札があれば、その会員の天井は手動額とする。
+        if (!isset($ceilings[$mid]) || $ceilings[$mid]['ceil'] < $amt) {
+            $ceilings[$mid] = [
+                'ceil' => $amt,
+                'ts' => $highest['created_at'] ? strtotime($highest['created_at']) : PHP_INT_MAX,
+            ];
+        }
+    }
+
+    if (empty($ceilings)) {
+        return;
+    }
+
+    // 天井の高い順、同額は設定が早い順（eBay同様、先に設定した方が勝つ）。
+    $list = [];
+    foreach ($ceilings as $mid => $c) {
+        $list[] = ['member' => $mid, 'ceil' => $c['ceil'], 'ts' => $c['ts']];
+    }
+    usort($list, function ($a, $b) {
+        if ($a['ceil'] !== $b['ceil']) {
+            return $b['ceil'] - $a['ceil'];
+        }
+        return $a['ts'] - $b['ts'];
+    });
+
+    $top = $list[0];
+    $second_ceil = isset($list[1]) ? $list[1]['ceil'] : ($start_price - $increment);
+
+    $final = min($top['ceil'], $second_ceil + $increment);
+    if ($final < $start_price) {
+        $final = $start_price;
+    }
+    if ($highest && $final < (int) $highest['amount']) {
+        $final = (int) $highest['amount']; // 価格は決して下げない
+    }
+
+    // 既に「先頭＝最高天井の会員」かつ金額一致なら変更不要。
+    if ($highest && (int) $highest['member_id'] === $top['member'] && (int) $highest['amount'] === $final) {
+        return;
+    }
+
+    $now = current_time('mysql');
+    $wpdb->query(
+        $wpdb->prepare("UPDATE {$bids_table} SET status = 'outbid' WHERE auction_id = %d AND status = 'active'", $auction_id)
+    );
+    $wpdb->insert(
+        $bids_table,
+        [
+            'auction_id' => $auction_id,
+            'member_id' => $top['member'],
+            'amount' => $final,
+            'status' => 'active',
+            'ip_address' => 'auto',
+            'user_agent' => 'autobid',
+            'created_at' => $now,
+        ],
+        ['%d', '%d', '%d', '%s', '%s', '%s', '%s']
+    );
+}
+
+/**
+ * 会員の自動入札を設定（または更新）し、プロキシを解決する。
+ *
+ * @param int $auction_id 投稿ID。
+ * @param int $member_id  会員ID。
+ * @param int $max_amount 上限額（秘密）。
+ * @return array|WP_Error 成功時は ['max'=>int,'is_leader'=>bool]。
+ */
+function gachasoku_apply_member_autobid($auction_id, $member_id, $max_amount) {
+    global $wpdb;
+
+    $auction_id = (int) $auction_id;
+    $member_id = (int) $member_id;
+    $max_amount = (int) $max_amount;
+
+    if (get_post_type($auction_id) !== GACHASOKU_AUCTION_POST_TYPE || get_post_status($auction_id) !== 'publish') {
+        return new WP_Error('not_found', 'オークションが見つかりませんでした。');
+    }
+    if ($max_amount <= 0) {
+        return new WP_Error('invalid_amount', '上限額が正しくありません。');
+    }
+
+    $lock_name = 'gachasoku_auction_' . $auction_id;
+    $locked = (int) $wpdb->get_var($wpdb->prepare('SELECT GET_LOCK(%s, %d)', $lock_name, 5));
+    if ($locked !== 1) {
+        return new WP_Error('busy', '只今アクセスが集中しています。少し時間をおいて再度お試しください。');
+    }
+
+    try {
+        if (gachasoku_get_auction_status($auction_id) !== 'open') {
+            return new WP_Error('closed', 'このオークションは現在入札を受け付けていません。');
+        }
+
+        $fields = gachasoku_get_auction_fields($auction_id);
+        $min_next = gachasoku_get_auction_min_next_bid($auction_id);
+        if ($max_amount < $min_next) {
+            return new WP_Error('too_low', '上限額は ' . number_format($min_next) . '円 以上に設定してください。');
+        }
+
+        $table = gachasoku_get_auction_autobids_table();
+        $now = current_time('mysql');
+        $existing = gachasoku_get_member_autobid($auction_id, $member_id);
+        if ($existing) {
+            $wpdb->update(
+                $table,
+                ['max_amount' => $max_amount, 'enabled' => 1, 'updated_at' => $now],
+                ['auction_id' => $auction_id, 'member_id' => $member_id],
+                ['%d', '%d', '%s'],
+                ['%d', '%d']
+            );
+        } else {
+            $wpdb->insert(
+                $table,
+                [
+                    'auction_id' => $auction_id,
+                    'member_id' => $member_id,
+                    'max_amount' => $max_amount,
+                    'enabled' => 1,
+                    'created_at' => $now,
+                    'updated_at' => $now,
+                ],
+                ['%d', '%d', '%d', '%d', '%s', '%s']
+            );
+        }
+
+        gachasoku_resolve_auto_bids($auction_id, (int) $fields['bid_increment'], (int) $fields['start_price']);
+
+        $final_highest = gachasoku_get_auction_highest_bid($auction_id);
+        $is_leader = ($final_highest && (int) $final_highest['member_id'] === $member_id);
+
+        return ['max' => $max_amount, 'is_leader' => $is_leader];
+    } finally {
+        $wpdb->query($wpdb->prepare('SELECT RELEASE_LOCK(%s)', $lock_name));
+    }
+}
+
+add_action('init', 'gachasoku_handle_auction_autobid', 20);
+/**
+ * 自動入札フォームの送信を処理する（PRG）。
+ *
+ * @return void
+ */
+function gachasoku_handle_auction_autobid() {
+    if (empty($_POST['gachasoku_auction_autobid_submit'])) {
+        return;
+    }
+
+    $auction_id = isset($_POST['gachasoku_auction_id']) ? (int) $_POST['gachasoku_auction_id'] : 0;
+
+    $nonce = isset($_POST['gachasoku_auction_autobid_nonce']) ? sanitize_text_field(wp_unslash($_POST['gachasoku_auction_autobid_nonce'])) : '';
+    if (!$auction_id || !wp_verify_nonce($nonce, 'gachasoku_auction_autobid_' . $auction_id)) {
+        gachasoku_auction_redirect_with_flash($auction_id, 'error', 'フォームの有効期限が切れました。再度お試しください。');
+    }
+
+    if (!gachasoku_is_member_logged_in()) {
+        gachasoku_auction_redirect_with_flash($auction_id, 'error', '自動入札の設定にはログインが必要です。');
+    }
+
+    $member_id = gachasoku_get_current_member_id();
+    if (gachasoku_get_member_status($member_id) !== GACHASOKU_MEMBER_STATUS_ACTIVE) {
+        gachasoku_auction_redirect_with_flash($auction_id, 'error', '現在のステータスでは自動入札を設定できません。');
+    }
+
+    $enable = !empty($_POST['gachasoku_auction_autobid_enable']);
+
+    if (!$enable) {
+        gachasoku_disable_member_autobid($auction_id, $member_id);
+        gachasoku_auction_redirect_with_flash($auction_id, 'success', '自動入札をオフにしました。');
+    }
+
+    $max = isset($_POST['gachasoku_auction_autobid_max']) ? (int) $_POST['gachasoku_auction_autobid_max'] : 0;
+    $result = gachasoku_apply_member_autobid($auction_id, $member_id, $max);
+
+    if (is_wp_error($result)) {
+        gachasoku_auction_redirect_with_flash($auction_id, 'error', $result->get_error_message());
+    }
+
+    if (empty($result['is_leader'])) {
+        gachasoku_auction_redirect_with_flash($auction_id, 'success', '自動入札を設定しました（上限 ' . number_format($result['max']) . '円）。現在は他のユーザーが上回っています。上限額を上げると有利になります。');
+    }
+
+    gachasoku_auction_redirect_with_flash($auction_id, 'success', '自動入札を設定しました（上限 ' . number_format($result['max']) . '円）。設定額まで自動で入札します。');
 }
 
 /* =========================================================================
@@ -1266,6 +1596,7 @@ function gachasoku_render_auction_detail($auction_id) {
 
         <?php if ($status === 'open') : ?>
             <?php echo gachasoku_render_auction_bid_form($auction_id, $min_next, $fields); ?>
+            <?php echo gachasoku_render_auction_autobid_form($auction_id, $min_next, $fields); ?>
         <?php elseif ($status === 'scheduled') : ?>
             <p class="gachasoku-auction__notice">このオークションはまだ開始していません。<?php echo esc_html(gachasoku_format_datetime($fields['start_datetime'])); ?> に開始予定です。</p>
         <?php else : ?>
@@ -1352,6 +1683,81 @@ function gachasoku_render_auction_bid_form($auction_id, $min_next, $fields) {
             <button type="submit" class="gachasoku-button gachasoku-button--buy-now">即決価格（<?php echo esc_html(number_format($fields['buy_now_price'])); ?>円）で落札</button>
         </form>
     <?php endif; ?>
+    <?php
+    return ob_get_clean();
+}
+
+/**
+ * 自動入札フォームを描画する（ログイン＆有効会員のみ）。
+ *
+ * 上限額は本人にのみ表示し、他ユーザーには一切出力しない。
+ *
+ * @param int   $auction_id 投稿ID。
+ * @param int   $min_next   最低入札額。
+ * @param array $fields     出品メタ。
+ * @return string
+ */
+function gachasoku_render_auction_autobid_form($auction_id, $min_next, $fields) {
+    if (!gachasoku_is_member_logged_in()) {
+        return '';
+    }
+
+    $member_id = gachasoku_get_current_member_id();
+    if (gachasoku_get_member_status($member_id) !== GACHASOKU_MEMBER_STATUS_ACTIVE) {
+        return '';
+    }
+
+    // 本人の現在設定のみ取得（他人の設定は決して参照・表示しない）。
+    $own = gachasoku_get_member_autobid($auction_id, $member_id);
+    $is_on = ($own && (int) $own['enabled'] === 1);
+    $own_max = $is_on ? (int) $own['max_amount'] : 0;
+    $affiliate = $fields['affiliate_link'];
+
+    ob_start();
+    ?>
+    <div class="gachasoku-autobid" data-affiliate="<?php echo esc_attr($affiliate); ?>">
+        <div class="gachasoku-autobid__head">
+            <span class="gachasoku-autobid__label">自動入札</span>
+            <label class="gachasoku-autobid__switch">
+                <input type="checkbox" class="gachasoku-autobid-toggle" <?php checked($is_on); ?> />
+                <span class="gachasoku-autobid__slider"></span>
+            </label>
+        </div>
+        <?php if ($affiliate !== '') : ?>
+            <p class="gachasoku-autobid__note">有効化すると提携ページが開きます</p>
+        <?php endif; ?>
+
+        <?php if ($is_on) : ?>
+            <p class="gachasoku-autobid__status">現在ON（上限 <strong><?php echo esc_html(number_format($own_max)); ?></strong> 円）。設定額まで自動で入札します。</p>
+        <?php endif; ?>
+
+        <div class="gachasoku-autobid__fields" <?php echo $is_on ? '' : 'hidden'; ?>>
+            <form method="post" class="gachasoku-autobid__form">
+                <?php wp_nonce_field('gachasoku_auction_autobid_' . $auction_id, 'gachasoku_auction_autobid_nonce'); ?>
+                <input type="hidden" name="gachasoku_auction_id" value="<?php echo esc_attr($auction_id); ?>" />
+                <input type="hidden" name="gachasoku_auction_autobid_submit" value="1" />
+                <input type="hidden" name="gachasoku_auction_autobid_enable" value="1" />
+                <div class="gachasoku-auction__bid-field">
+                    <label for="gachasoku_auction_autobid_max">自動入札の上限額（円）</label>
+                    <input type="number" name="gachasoku_auction_autobid_max" id="gachasoku_auction_autobid_max"
+                           min="<?php echo esc_attr($min_next); ?>" step="<?php echo esc_attr(max(1, $fields['bid_increment'])); ?>"
+                           value="<?php echo esc_attr($own_max > 0 ? $own_max : $min_next); ?>" />
+                    <p class="gachasoku-auction__hint">この金額まで、システムが必要最小限ずつ自動で入札します（上限額は他のユーザーには表示されません）。</p>
+                </div>
+                <div class="gachasoku-auction__bid-actions">
+                    <button type="submit" class="gachasoku-button"><?php echo $is_on ? '上限額を更新' : '自動入札を設定'; ?></button>
+                </div>
+            </form>
+            <?php if ($is_on) : ?>
+                <form method="post" class="gachasoku-autobid__off-form">
+                    <?php wp_nonce_field('gachasoku_auction_autobid_' . $auction_id, 'gachasoku_auction_autobid_nonce'); ?>
+                    <input type="hidden" name="gachasoku_auction_id" value="<?php echo esc_attr($auction_id); ?>" />
+                    <input type="hidden" name="gachasoku_auction_autobid_submit" value="1" />
+                    <button type="submit" class="gachasoku-autobid__off">自動入札をオフにする</button>
+                </form>
+            <?php endif; ?>
+        </div>
+    </div>
     <?php
     return ob_get_clean();
 }
@@ -1820,6 +2226,21 @@ function gachasoku_auction_front_styles() {
     .gachasoku-button:hover{opacity:.9;}
     .gachasoku-button--buy-now{background:#b42318;}
     .gachasoku-button--small{font-size:13px;padding:6px 14px;}
+    /* 自動入札 */
+    .gachasoku-autobid{margin:16px 0;padding:16px;background:#f5f8ff;border:1px solid #d6e0ff;border-radius:10px;}
+    .gachasoku-autobid__head{display:flex;align-items:center;justify-content:space-between;}
+    .gachasoku-autobid__label{font-weight:bold;font-size:16px;}
+    .gachasoku-autobid__switch{position:relative;display:inline-block;width:52px;height:28px;}
+    .gachasoku-autobid__switch input{opacity:0;width:0;height:0;}
+    .gachasoku-autobid__slider{position:absolute;cursor:pointer;inset:0;background:#bbb;border-radius:999px;transition:.2s;}
+    .gachasoku-autobid__slider:before{content:"";position:absolute;height:22px;width:22px;left:3px;top:3px;background:#fff;border-radius:50%;transition:.2s;}
+    .gachasoku-autobid__switch input:checked + .gachasoku-autobid__slider{background:#1a7f37;}
+    .gachasoku-autobid__switch input:checked + .gachasoku-autobid__slider:before{transform:translateX(24px);}
+    .gachasoku-autobid__note{font-size:12px;color:#888;margin:6px 0 0;}
+    .gachasoku-autobid__status{margin:10px 0 0;padding:8px 12px;background:#e6f7ec;color:#1a7f37;border-radius:8px;font-size:14px;}
+    .gachasoku-autobid__fields{margin-top:12px;}
+    .gachasoku-autobid__off-form{margin-top:8px;}
+    .gachasoku-autobid__off{background:none;border:none;color:#b42318;text-decoration:underline;cursor:pointer;font-size:13px;padding:0;}
     .gachasoku-auction__notice{padding:12px 16px;background:#faf9f6;border-radius:8px;margin:12px 0;}
     .gachasoku-auction__notice--win{background:#e6f7ec;color:#1a7f37;font-weight:bold;}
     .gachasoku-auction__history{margin-top:24px;}
